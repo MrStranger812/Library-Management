@@ -1,0 +1,187 @@
+{% extends "layout.html" %}
+{% block title %}Books Management{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Books Management</h2>
+    </div>
+    <div class="col-md-6 text-end">
+        {% if current_user.has_permission('manage_books') %}
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addBookModal">Add New Book</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="input-group">
+            <input type="text" id="searchInput" class="form-control" placeholder="Search books...">
+            <button class="btn btn-outline-secondary" type="button" id="searchBtn">Search</button>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ISBN</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Category</th>
+                <th>Publication Year</th>
+                <th>Available Copies</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="booksTableBody">
+            <!-- Book rows will be loaded dynamically with JavaScript -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination controls -->
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center" id="pagination">
+        <!-- Pagination will be generated with JavaScript -->
+    </ul>
+</nav>
+
+<!-- Add Book Modal -->
+<div class="modal fade" id="addBookModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Book</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBookForm">
+                    <div class="mb-3">
+                        <label for="isbn" class="form-label">ISBN</label>
+                        <input type="text" class="form-control" id="isbn" name="isbn" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="author" class="form-label">Author</label>
+                        <input type="text" class="form-control" id="author" name="author" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <input type="text" class="form-control" id="category" name="category" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="publicationYear" class="form-label">Publication Year</label>
+                        <input type="number" class="form-control" id="publicationYear" name="publicationYear">
+                    </div>
+                    <div class="mb-3">
+                        <label for="copies" class="form-label">Copies</label>
+                        <input type="number" class="form-control" id="copies" name="copies" value="1" min="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBookBtn">Save Book</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Book Modal (similar to Add Book Modal) -->
+<div class="modal fade" id="editBookModal" tabindex="-1" aria-hidden="true">
+    <!-- Similar structure to Add Book Modal with populated fields -->
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // JavaScript for handling book management
+    document.addEventListener('DOMContentLoaded', function() {
+        loadBooks();
+        
+        // Event listeners
+        document.getElementById('searchBtn').addEventListener('click', function() {
+            loadBooks(document.getElementById('searchInput').value);
+        });
+        
+        document.getElementById('searchInput').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                loadBooks(this.value);
+            }
+        });
+        
+        document.getElementById('saveBookBtn').addEventListener('click', saveBook);
+    });
+    
+    function loadBooks(query = '') {
+        fetch(`/api/books?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.getElementById('booksTableBody');
+                tableBody.innerHTML = '';
+                
+                data.forEach(book => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${book.isbn}</td>
+                        <td>${book.title}</td>
+                        <td>${book.author}</td>
+                        <td>${book.category}</td>
+                        <td>${book.publication_year || '-'}</td>
+                        <td>${book.copies_available}/${book.total_copies}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-info view-btn" data-id="${book.book_id}">View</button>
+                                ${currentUserCanManageBooks ? `
+                                <button class="btn btn-warning edit-btn" data-id="${book.book_id}">Edit</button>
+                                <button class="btn btn-danger delete-btn" data-id="${book.book_id}">Delete</button>
+                                ` : ''}
+                                ${currentUserCanBorrowBooks && book.copies_available > 0 ? `
+                                <button class="btn btn-success borrow-btn" data-id="${book.book_id}">Borrow</button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                // Add event listeners to buttons
+                setupButtonEventListeners();
+            })
+            .catch(error => console.error('Error loading books:', error));
+    }
+    
+    function saveBook() {
+        const form = document.getElementById('addBookForm');
+        const formData = new FormData(form);
+        
+        fetch('/api/books', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(Object.fromEntries(formData)),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Close modal and reload books
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addBookModal'));
+                modal.hide();
+                form.reset();
+                loadBooks();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => console.error('Error saving book:', error));
+    }
+    
+    // Add more functions for edit, delete, borrow...
+</script>
+{% endblock %}

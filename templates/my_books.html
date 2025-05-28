@@ -1,0 +1,318 @@
+{% extends "layout.html" %}
+{% block title %}My Books - Library Management System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>My Books</h2>
+        <p class="lead">Manage your borrowed books and reservations</p>
+    </div>
+</div>
+
+<!-- Tabs for different sections -->
+<ul class="nav nav-tabs mb-4" id="myBooksTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="borrowed-tab" data-bs-toggle="tab" data-bs-target="#borrowed" type="button" role="tab" aria-controls="borrowed" aria-selected="true">Borrowed Books</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">Borrowing History</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="reservations-tab" data-bs-toggle="tab" data-bs-target="#reservations" type="button" role="tab" aria-controls="reservations" aria-selected="false">Reservations</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="fines-tab" data-bs-toggle="tab" data-bs-target="#fines" type="button" role="tab" aria-controls="fines" aria-selected="false">Fines</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="myBooksTabContent">
+    <!-- Currently Borrowed Books -->
+    <div class="tab-pane fade show active" id="borrowed" role="tabpanel" aria-labelledby="borrowed-tab">
+        {% if current_borrowings %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Book Title</th>
+                        <th>Author</th>
+                        <th>Borrowed Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for borrowing in current_borrowings %}
+                    <tr>
+                        <td>{{ borrowing.title }}</td>
+                        <td>{{ borrowing.author }}</td>
+                        <td>{{ borrowing.borrow_date }}</td>
+                        <td>
+                            {% if borrowing.status == 'overdue' %}
+                            <span class="text-danger fw-bold">{{ borrowing.due_date }}</span>
+                            {% else %}
+                            {{ borrowing.due_date }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if borrowing.status == 'borrowed' %}
+                            <span class="badge bg-success">Borrowed</span>
+                            {% elif borrowing.status == 'overdue' %}
+                            <span class="badge bg-danger">Overdue</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary return-book" data-id="{{ borrowing.borrowing_id }}">
+                                Return Book
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p class="mb-0">You don't have any books currently borrowed.</p>
+        </div>
+        <div class="text-center mt-3">
+            <a href="{{ url_for('books') }}" class="btn btn-primary">Browse Books</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Borrowing History -->
+    <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+        {% if borrowing_history %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Book Title</th>
+                        <th>Author</th>
+                        <th>Borrowed Date</th>
+                        <th>Returned Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for borrowing in borrowing_history %}
+                    <tr>
+                        <td>{{ borrowing.title }}</td>
+                        <td>{{ borrowing.author }}</td>
+                        <td>{{ borrowing.borrow_date }}</td>
+                        <td>{{ borrowing.return_date }}</td>
+                        <td>
+                            {% if borrowing.status == 'returned' %}
+                            <span class="badge bg-secondary">Returned</span>
+                            {% elif borrowing.status == 'lost' %}
+                            <span class="badge bg-warning text-dark">Lost</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p class="mb-0">You don't have any borrowing history yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Reservations -->
+    <div class="tab-pane fade" id="reservations" role="tabpanel" aria-labelledby="reservations-tab">
+        {% if reservations %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Book Title</th>
+                        <th>Author</th>
+                        <th>Reservation Date</th>
+                        <th>Expiry Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reservation in reservations %}
+                    <tr>
+                        <td>{{ reservation.title }}</td>
+                        <td>{{ reservation.author }}</td>
+                        <td>{{ reservation.reservation_date }}</td>
+                        <td>{{ reservation.expiry_date }}</td>
+                        <td>
+                            {% if reservation.status == 'pending' %}
+                            <span class="badge bg-warning text-dark">Pending</span>
+                            {% elif reservation.status == 'fulfilled' %}
+                            <span class="badge bg-success">Fulfilled</span>
+                            {% elif reservation.status == 'expired' %}
+                            <span class="badge bg-danger">Expired</span>
+                            {% elif reservation.status == 'cancelled' %}
+                            <span class="badge bg-secondary">Cancelled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if reservation.status == 'pending' %}
+                            <button class="btn btn-sm btn-danger cancel-reservation" data-id="{{ reservation.reservation_id }}">
+                                Cancel
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p class="mb-0">You don't have any active reservations.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Fines -->
+    <div class="tab-pane fade" id="fines" role="tabpanel" aria-labelledby="fines-tab">
+        {% if fines %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Book Title</th>
+                        <th>Fine Amount</th>
+                        <th>Reason</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fine in fines %}
+                    <tr>
+                        <td>{{ fine.title }}</td>
+                        <td>${{ fine.amount }}</td>
+                        <td>{{ fine.reason }}</td>
+                        <td>{{ fine.created_at }}</td>
+                        <td>
+                            {% if fine.is_paid %}
+                            <span class="badge bg-success">Paid</span>
+                            {% else %}
+                            <span class="badge bg-danger">Unpaid</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if not fine.is_paid %}
+                            <button class="btn btn-sm btn-primary pay-fine" data-id="{{ fine.fine_id }}" data-amount="{{ fine.amount }}">
+                                Pay Fine
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <p class="mb-0">You don't have any fines.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Return book functionality
+        document.querySelectorAll('.return-book').forEach(button => {
+            button.addEventListener('click', function() {
+                const borrowingId = this.dataset.id;
+                returnBook(borrowingId);
+            });
+        });
+
+        // Cancel reservation functionality
+        document.querySelectorAll('.cancel-reservation').forEach(button => {
+            button.addEventListener('click', function() {
+                const reservationId = this.dataset.id;
+                cancelReservation(reservationId);
+            });
+        });
+
+        // Pay fine functionality
+        document.querySelectorAll('.pay-fine').forEach(button => {
+            button.addEventListener('click', function() {
+                const fineId = this.dataset.id;
+                const amount = this.dataset.amount;
+                payFine(fineId, amount);
+            });
+        });
+    });
+
+    function returnBook(borrowingId) {
+        if (confirm('Are you sure you want to return this book?')) {
+            fetch(`/api/borrowings/${borrowingId}/return`, {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert(data.message);
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error returning book:', error);
+                alert('Error returning book. Please try again.');
+            });
+        }
+    }
+
+    function cancelReservation(reservationId) {
+        if (confirm('Are you sure you want to cancel this reservation?')) {
+            fetch(`/api/reservations/${reservationId}/cancel`, {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert(data.message);
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error cancelling reservation:', error);
+                alert('Error cancelling reservation. Please try again.');
+            });
+        }
+    }
+
+    function payFine(fineId, amount) {
+        if (confirm(`Are you sure you want to pay the fine of $${amount}?`)) {
+            fetch(`/api/fines/${fineId}/pay`, {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert(data.message);
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error paying fine:', error);
+                alert('Error paying fine. Please try again.');
+            });
+        }
+    }
+</script>
+{% endblock %}

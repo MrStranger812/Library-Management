@@ -1,0 +1,195 @@
+{% extends "layout.html" %}
+{% block title %}Dashboard - Library Management System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>Dashboard</h2>
+        <p class="lead">Welcome back, {{ current_user.full_name }}!</p>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="number">{{ stats.total_books }}</div>
+                <div class="label">Total Books</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="number">{{ stats.books_available }}</div>
+                <div class="label">Books Available</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="number">{{ stats.active_borrowings }}</div>
+                <div class="label">Active Borrowings</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="number">{{ stats.overdue_books }}</div>
+                <div class="label">Overdue Books</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">Quick Actions</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('books') }}" class="btn btn-primary d-block">
+                            <i class="bi bi-book me-2"></i> Browse Books
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('my_books') }}" class="btn btn-success d-block">
+                            <i class="bi bi-journal-check me-2"></i> My Borrowings
+                        </a>
+                    </div>
+                    {% if current_user.has_permission('manage_books') %}
+                    <div class="col-md-3 mb-2">
+                        <a href="#" class="btn btn-info d-block" data-bs-toggle="modal" data-bs-target="#addBookModal">
+                            <i class="bi bi-plus-circle me-2"></i> Add New Book
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if current_user.has_permission('manage_users') %}
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('users') }}" class="btn btn-secondary d-block">
+                            <i class="bi bi-people me-2"></i> Manage Users
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activities -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Recent Borrowings</div>
+            <div class="card-body">
+                {% if recent_borrowings %}
+                <div class="list-group">
+                    {% for borrowing in recent_borrowings %}
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">{{ borrowing.title }}</h5>
+                            <small>{{ borrowing.borrow_date }}</small>
+                        </div>
+                        <p class="mb-1">Borrowed by: {{ borrowing.username }}</p>
+                        <small>Due date: {{ borrowing.due_date }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center">No recent borrowings</p>
+                {% endif %}
+            </div>
+            <div class="card-footer text-center">
+                <a href="{{ url_for('borrowings') }}">View all borrowings</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Recently Added Books</div>
+            <div class="card-body">
+                {% if recent_books %}
+                <div class="list-group">
+                    {% for book in recent_books %}
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">{{ book.title }}</h5>
+                            <small>{{ book.added_at }}</small>
+                        </div>
+                        <p class="mb-1">By: {{ book.author }}</p>
+                        <small>{{ book.copies_available }} of {{ book.total_copies }} available</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-center">No recently added books</p>
+                {% endif %}
+            </div>
+            <div class="card-footer text-center">
+                <a href="{{ url_for('books') }}">View all books</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Book Modal -->
+{% if current_user.has_permission('manage_books') %}
+<div class="modal fade" id="addBookModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Book</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addBookForm">
+                    <div class="mb-3">
+                        <label for="isbn" class="form-label">ISBN</label>
+                        <input type="text" class="form-control" id="isbn" name="isbn" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="author" class="form-label">Author</label>
+                        <input type="text" class="form-control" id="author" name="author" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <input type="text" class="form-control" id="category" name="category" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="publicationYear" class="form-label">Publication Year</label>
+                        <input type="number" class="form-control" id="publicationYear" name="publicationYear">
+                    </div>
+                    <div class="mb-3">
+                        <label for="copies" class="form-label">Copies</label>
+                        <input type="number" class="form-control" id="copies" name="copies" value="1" min="1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBookBtn">Save Book</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load dashboard data
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dashboard components if needed
+    });
+</script>
+{% endblock %}

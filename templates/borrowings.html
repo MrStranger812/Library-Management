@@ -1,0 +1,570 @@
+{% extends "layout.html" %}
+{% block title %}Borrowings Management - Library Management System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Borrowings Management</h2>
+    </div>
+    <div class="col-md-6 text-end">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newBorrowingModal">New Borrowing</button>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="borrowingsTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="active-tab" data-bs-toggle="tab" data-bs-target="#active" type="button" role="tab" aria-controls="active" aria-selected="true">Active</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="overdue-tab" data-bs-toggle="tab" data-bs-target="#overdue" type="button" role="tab" aria-controls="overdue" aria-selected="false">Overdue</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="returned-tab" data-bs-toggle="tab" data-bs-target="#returned" type="button" role="tab" aria-controls="returned" aria-selected="false">Returned</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab" aria-controls="all" aria-selected="false">All</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="borrowingsTabContent">
+                    <!-- Active Borrowings Tab -->
+                    <div class="tab-pane fade show active" id="active" role="tabpanel" aria-labelledby="active-tab">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Search active borrowings..." id="activeSearchInput">
+                            <button class="btn btn-outline-secondary" type="button" id="activeSearchBtn">Search</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User</th>
+                                        <th>Book</th>
+                                        <th>Borrow Date</th>
+                                        <th>Due Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activeBorrowingsTable">
+                                    <!-- Active borrowings will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="Active borrowings pagination">
+                            <ul class="pagination justify-content-center" id="activePagination">
+                                <!-- Pagination will be generated with JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                    
+                    <!-- Overdue Borrowings Tab -->
+                    <div class="tab-pane fade" id="overdue" role="tabpanel" aria-labelledby="overdue-tab">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Search overdue borrowings..." id="overdueSearchInput">
+                            <button class="btn btn-outline-secondary" type="button" id="overdueSearchBtn">Search</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User</th>
+                                        <th>Book</th>
+                                        <th>Borrow Date</th>
+                                        <th>Due Date</th>
+                                        <th>Days Overdue</th>
+                                        <th>Fine</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="overdueBorrowingsTable">
+                                    <!-- Overdue borrowings will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="Overdue borrowings pagination">
+                            <ul class="pagination justify-content-center" id="overduePagination">
+                                <!-- Pagination will be generated with JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                    
+                    <!-- Returned Borrowings Tab -->
+                    <div class="tab-pane fade" id="returned" role="tabpanel" aria-labelledby="returned-tab">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Search returned borrowings..." id="returnedSearchInput">
+                            <button class="btn btn-outline-secondary" type="button" id="returnedSearchBtn">Search</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User</th>
+                                        <th>Book</th>
+                                        <th>Borrow Date</th>
+                                        <th>Return Date</th>
+                                        <th>Fine</th>
+                                        <th>Fine Paid</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="returnedBorrowingsTable">
+                                    <!-- Returned borrowings will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="Returned borrowings pagination">
+                            <ul class="pagination justify-content-center" id="returnedPagination">
+                                <!-- Pagination will be generated with JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                    
+                    <!-- All Borrowings Tab -->
+                    <div class="tab-pane fade" id="all" role="tabpanel" aria-labelledby="all-tab">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control" placeholder="Search all borrowings..." id="allSearchInput">
+                            <button class="btn btn-outline-secondary" type="button" id="allSearchBtn">Search</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User</th>
+                                        <th>Book</th>
+                                        <th>Borrow Date</th>
+                                        <th>Due Date</th>
+                                        <th>Return Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="allBorrowingsTable">
+                                    <!-- All borrowings will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="All borrowings pagination">
+                            <ul class="pagination justify-content-center" id="allPagination">
+                                <!-- Pagination will be generated with JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Borrowing Modal -->
+<div class="modal fade" id="newBorrowingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Borrowing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newBorrowingForm">
+                    <div class="mb-3">
+                        <label for="userId" class="form-label">User</label>
+                        <select class="form-select" id="userId" name="user_id" required>
+                            <option value="">Select User</option>
+                            <!-- Users will be loaded dynamically -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bookId" class="form-label">Book</label>
+                        <select class="form-select" id="bookId" name="book_id" required>
+                            <option value="">Select Book</option>
+                            <!-- Available books will be loaded dynamically -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="borrowDays" class="form-label">Borrow Period (Days)</label>
+                        <input type="number" class="form-control" id="borrowDays" name="borrow_days" value="14" min="1" max="30" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBorrowingBtn">Create Borrowing</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Return Book Modal -->
+<div class="modal fade" id="returnBookModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Return Book</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="returnBookForm">
+                    <input type="hidden" id="returnBorrowingId" name="borrowing_id">
+                    <div id="returnBookDetails">
+                        <!-- Book details will be loaded here -->
+                    </div>
+                    <div class="mb-3" id="fineContainer" style="display: none;">
+                        <label for="fineAmount" class="form-label">Fine Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="fineAmount" name="fine_amount" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="returnNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="returnNotes" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmReturnBtn">Confirm Return</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load active borrowings on page load
+        loadBorrowings('active');
+        
+        // Tab change event handlers
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function(event) {
+                const targetId = event.target.getAttribute('aria-controls');
+                loadBorrowings(targetId);
+            });
+        });
+        
+        // Search button click handlers
+        document.getElementById('activeSearchBtn').addEventListener('click', function() {
+            const query = document.getElementById('activeSearchInput').value;
+            loadBorrowings('active', query);
+        });
+        
+        document.getElementById('overdueSearchBtn').addEventListener('click', function() {
+            const query = document.getElementById('overdueSearchInput').value;
+            loadBorrowings('overdue', query);
+        });
+        
+        document.getElementById('returnedSearchBtn').addEventListener('click', function() {
+            const query = document.getElementById('returnedSearchInput').value;
+            loadBorrowings('returned', query);
+        });
+        
+        document.getElementById('allSearchBtn').addEventListener('click', function() {
+            const query = document.getElementById('allSearchInput').value;
+            loadBorrowings('all', query);
+        });
+        
+        // New borrowing modal initialization
+        const newBorrowingModal = document.getElementById('newBorrowingModal');
+        if (newBorrowingModal) {
+            newBorrowingModal.addEventListener('show.bs.modal', function() {
+                // Load users and books for the dropdowns
+                loadUsersForDropdown();
+                loadAvailableBooksForDropdown();
+            });
+        }
+        
+        // Save new borrowing button click handler
+        document.getElementById('saveBorrowingBtn').addEventListener('click', function() {
+            const form = document.getElementById('newBorrowingForm');
+            if (form.checkValidity()) {
+                const formData = new FormData(form);
+                const borrowingData = Object.fromEntries(formData.entries());
+                
+                fetch('/api/borrowings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(borrowingData),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showAlert(data.error, 'danger');
+                    } else {
+                        showAlert('Borrowing created successfully', 'success');
+                        // Close modal and refresh borrowings list
+                        const modal = bootstrap.Modal.getInstance(newBorrowingModal);
+                        modal.hide();
+                        loadBorrowings('active');
+                        form.reset();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating borrowing:', error);
+                    showAlert('Error creating borrowing. Please try again.', 'danger');
+                });
+            } else {
+                form.reportValidity();
+            }
+        });
+        
+        // Return book modal initialization
+        const returnBookModal = document.getElementById('returnBookModal');
+        if (returnBookModal) {
+            returnBookModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const borrowingId = button.getAttribute('data-id');
+                document.getElementById('returnBorrowingId').value = borrowingId;
+                
+                // Load borrowing details
+                fetch(`/api/borrowings/${borrowingId}`)
+                    .then(response => response.json())
+                    .then(borrowing => {
+                        const detailsContainer = document.getElementById('returnBookDetails');
+                        detailsContainer.innerHTML = `
+                            <div class="alert alert-info">
+                                <p><strong>Book:</strong> ${borrowing.book_title}</p>
+                                <p><strong>User:</strong> ${borrowing.user_name}</p>
+                                <p><strong>Borrowed:</strong> ${borrowing.borrow_date}</p>
+                                <p><strong>Due Date:</strong> ${borrowing.due_date}</p>
+                            </div>
+                        `;
+                        
+                        // Check if book is overdue
+                        const dueDate = new Date(borrowing.due_date);
+                        const today = new Date();
+                        if (today > dueDate) {
+                            const fineContainer = document.getElementById('fineContainer');
+                            fineContainer.style.display = 'block';
+                            
+                            // Calculate suggested fine
+                            const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+                            const suggestedFine = daysOverdue * 0.50; // $0.50 per day
+                            document.getElementById('fineAmount').value = suggestedFine.toFixed(2);
+                        } else {
+                            const fineContainer = document.getElementById('fineContainer');
+                            fineContainer.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading borrowing details:', error);
+                        showAlert('Error loading borrowing details. Please try again.', 'danger');
+                    });
+            });
+        }
+        
+        // Confirm return button click handler
+        document.getElementById('confirmReturnBtn').addEventListener('click', function() {
+            const form = document.getElementById('returnBookForm');
+            const formData = new FormData(form);
+            const returnData = Object.fromEntries(formData.entries());
+            const borrowingId = returnData.borrowing_id;
+            
+            fetch(`/api/borrowings/${borrowingId}/return`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(returnData),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showAlert(data.error, 'danger');
+                } else {
+                    showAlert('Book returned successfully', 'success');
+                    // Close modal and refresh borrowings list
+                    const modal = bootstrap.Modal.getInstance(returnBookModal);
+                    modal.hide();
+                    loadBorrowings('active');
+                    form.reset();
+                }
+            })
+            .catch(error => {
+                console.error('Error returning book:', error);
+                showAlert('Error returning book. Please try again.', 'danger');
+            });
+        });
+    });
+    
+    function loadBorrowings(type, query = '') {
+        let url = `/api/borrowings?type=${type}`;
+        if (query) {
+            url += `&q=${encodeURIComponent(query)}`;
+        }
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                displayBorrowings(type, data);
+            })
+            .catch(error => {
+                console.error(`Error loading ${type} borrowings:`, error);
+                showAlert(`Error loading borrowings. Please try again.`, 'danger');
+            });
+    }
+    
+    function displayBorrowings(type, borrowings) {
+        const tableId = `${type}BorrowingsTable`;
+        const tableBody = document.getElementById(tableId);
+        if (!tableBody) return;
+        
+        tableBody.innerHTML = '';
+        
+        if (borrowings.length === 0) {
+            const colSpan = type === 'returned' ? 7 : 8;
+            tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="text-center">No borrowings found</td></tr>`;
+            return;
+        }
+        
+        borrowings.forEach(borrowing => {
+            const row = document.createElement('tr');
+            
+            // Common columns
+            let html = `
+                <td>${borrowing.borrowing_id}</td>
+                <td>${borrowing.user_name}</td>
+                <td>${borrowing.book_title}</td>
+                <td>${borrowing.borrow_date}</td>
+            `;
+            
+            // Type-specific columns
+            if (type === 'active') {
+                html += `
+                    <td>${borrowing.due_date}</td>
+                    <td><span class="badge bg-success">Borrowed</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary return-book" data-bs-toggle="modal" data-bs-target="#returnBookModal" data-id="${borrowing.borrowing_id}">
+                            Return
+                        </button>
+                    </td>
+                `;
+            } else if (type === 'overdue') {
+                const dueDate = new Date(borrowing.due_date);
+                const today = new Date();
+                const daysOverdue = Math.ceil((today - dueDate) / (1000 * 60 * 60 * 24));
+                const fine = daysOverdue * 0.50; // $0.50 per day
+                
+                html += `
+                    <td>${borrowing.due_date}</td>
+                    <td>${daysOverdue}</td>
+                    <td>$${fine.toFixed(2)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary return-book" data-bs-toggle="modal" data-bs-target="#returnBookModal" data-id="${borrowing.borrowing_id}">
+                            Return
+                        </button>
+                    </td>
+                `;
+            } else if (type === 'returned') {
+                html += `
+                    <td>${borrowing.return_date}</td>
+                    <td>$${borrowing.fine_amount.toFixed(2)}</td>
+                    <td>
+                        <span class="badge bg-${borrowing.fine_paid ? 'success' : 'danger'}">
+                            ${borrowing.fine_paid ? 'Paid' : 'Unpaid'}
+                        </span>
+                    </td>
+                `;
+            } else if (type === 'all') {
+                html += `
+                    <td>${borrowing.due_date}</td>
+                    <td>${borrowing.return_date || '-'}</td>
+                    <td>
+                        <span class="badge bg-${getBadgeColorForStatus(borrowing.status)}">
+                            ${borrowing.status}
+                        </span>
+                    </td>
+                    <td>
+                        ${borrowing.status === 'borrowed' || borrowing.status === 'overdue' ? 
+                            `<button class="btn btn-sm btn-primary return-book" data-bs-toggle="modal" data-bs-target="#returnBookModal" data-id="${borrowing.borrowing_id}">
+                                Return
+                            </button>` : 
+                            '-'}
+                    </td>
+                `;
+            }
+            
+            row.innerHTML = html;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    function getBadgeColorForStatus(status) {
+        switch (status) {
+            case 'borrowed': return 'success';
+            case 'overdue': return 'danger';
+            case 'returned': return 'secondary';
+            case 'lost': return 'warning text-dark';
+            default: return 'info';
+        }
+    }
+    
+    function loadUsersForDropdown() {
+        fetch('/api/users')
+            .then(response => response.json())
+            .then(users => {
+                const select = document.getElementById('userId');
+                select.innerHTML = '<option value="">Select User</option>';
+                
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.user_id;
+                    option.textContent = `${user.full_name} (${user.username})`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading users:', error);
+                showAlert('Error loading users. Please try again.', 'danger');
+            });
+    }
+    
+    function loadAvailableBooksForDropdown() {
+        fetch('/api/books?available=true')
+            .then(response => response.json())
+            .then(books => {
+                const select = document.getElementById('bookId');
+                select.innerHTML = '<option value="">Select Book</option>';
+                
+                books.forEach(book => {
+                    const option = document.createElement('option');
+                    option.value = book.book_id;
+                    option.textContent = `${book.title} by ${book.author} (${book.copies_available} available)`;
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading books:', error);
+                showAlert('Error loading books. Please try again.', 'danger');
+            });
+    }
+    
+    function showAlert(message, type = 'info') {
+        const alertContainer = document.createElement('div');
+        alertContainer.className = `alert alert-${type} alert-dismissible fade show`;
+        alertContainer.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        const container = document.querySelector('.container');
+        container.insertBefore(alertContainer, container.firstChild);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            const alert = bootstrap.Alert.getOrCreateInstance(alertContainer);
+            alert.close();
+        }, 5000);
+    }
+</script>
+{% endblock %}

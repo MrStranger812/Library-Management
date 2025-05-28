@@ -1,0 +1,233 @@
+
+## Utility Modules
+
+### Export Utility (`utils/export.py`)
+
+Provides functionality to export data in various formats:
+
+- `export_to_csv()`: Exports data to CSV format for download
+- `export_to_pdf()`: Exports data to PDF format for download
+
+These functions take data (as lists of dictionaries or tuples), format it appropriately, and return Flask response objects with the correct headers for file downloads.
+
+### Database Manager (`utils/db_manager.py`)
+
+Manages database connections and provides helper functions for database operations:
+
+- `get_db_cursor()`: Context manager for database cursor
+- `execute_query()`: Executes SELECT queries and returns results
+- `execute_update()`: Executes INSERT/UPDATE/DELETE queries
+- `insert_and_get_id()`: Inserts a record and returns the new ID
+
+This module simplifies database operations and ensures proper connection handling.
+
+### Configuration Manager (`utils/config_manager.py`)
+
+Manages application configuration from environment variables and config files:
+
+- `get()`: Retrieves configuration values
+- `set()`: Sets configuration values
+- `save_to_file()`: Saves configuration to file
+
+Implements the singleton pattern to ensure consistent configuration across the application.
+
+### Logger (`utils/logger.py`)
+
+Provides logging functionality with different log levels and output destinations:
+
+- `get_logger()`: Returns a configured logger for a specific component
+- Supports file and console logging
+- Implements log rotation to manage log file sizes
+
+### Error Handler (`utils/error_handler.py`)
+
+Centralizes error handling for the application:
+
+- `register_error_handlers()`: Registers error handlers with Flask
+- Provides consistent error responses for different error types
+- Supports both HTML and JSON responses based on request type
+
+### Scheduler (`utils/scheduler.py`)
+
+Manages background tasks and scheduled jobs:
+
+- `start()`: Starts the scheduler in a background thread
+- `stop()`: Stops the scheduler
+- `add_job()`: Adds a new job to the scheduler
+- Includes predefined jobs for due date notifications and overdue book status updates
+
+### Backup Utility (`utils/backup.py`)
+
+Provides database backup and restoration functionality:
+
+- `create_database_backup()`: Creates a backup of the database
+- `restore_database_backup()`: Restores the database from a backup
+- `list_backups()`: Lists available database backups with metadata
+
+This module ensures data safety through regular backups and provides disaster recovery capabilities.
+
+### Pagination Utility (`utils/pagination.py`)
+
+Handles pagination for lists of items:
+
+- `Pagination` class: Manages pagination state and calculations
+- `get_pagination_args()`: Extracts pagination parameters from requests
+- `iter_pages()`: Generates page numbers for pagination UI
+
+### Search Utility (`utils/search.py`)
+
+Provides advanced search functionality:
+
+- `search_books()`: Searches books with filters and sorting
+- `search_users()`: Searches users with filters and sorting
+- `get_book_categories()`: Gets all unique book categories
+
+### Statistics Utility (`utils/statistics.py`)
+
+Generates statistics and reports:
+
+- `get_dashboard_stats()`: Gets statistics for the dashboard
+- `get_borrowing_stats()`: Gets borrowing statistics for a specific period
+
+### Cache Utility (`utils/cache.py`)
+
+Provides in-memory caching:
+
+- `get()`: Retrieves a value from cache
+- `set()`: Stores a value in cache with optional TTL
+- `delete()`: Removes a value from cache
+- `clear()`: Clears all cache
+- `cached()`: Decorator for caching function results
+
+### Security Utility (`utils/security.py`)
+
+Implements security features:
+
+- `generate_token()`: Generates secure random tokens
+- `hash_data()`: Hashes data with optional salt
+- `verify_hash()`: Verifies data against a hash
+- `rate_limit()`: Implements rate limiting
+- `check_ip_rate_limit()`: Checks rate limit for current IP address
+
+### File Upload Utility (`utils/file_upload.py`)
+
+Handles file uploads:
+
+- `save_file()`: Saves uploaded files with validation
+- `delete_file()`: Deletes files
+- `allowed_file()`: Checks if file extension is allowed
+
+### Validator (`utils/validator.py`)
+
+Provides validation functions:
+
+- `validate_email()`: Validates email format
+- `validate_password()`: Validates password strength
+- `validate_isbn()`: Validates ISBN format
+- `validate_date()`: Validates date format
+- `sanitize_input()`: Sanitizes input to prevent injection attacks
+
+## Models
+
+### User Model (`models/user.py`)
+
+Manages user data and authentication:
+
+- User registration, login, and profile management
+- Password hashing and verification
+- Role-based permissions
+
+### Book Model (`models/book.py`)
+
+Manages book data:
+
+- Book creation, updating, and deletion
+- Book availability tracking
+- Book search and filtering
+
+### Borrowing Model (`models/borrowing.py`)
+
+Manages book borrowing:
+
+- Borrowing and returning books
+- Due date tracking
+- Overdue status and fine calculation
+
+### Notification Model (`models/notification.py`)
+
+Manages user notifications:
+
+- Creating notifications
+- Marking notifications as read
+- Notification delivery
+
+## Controllers
+
+### Auth Controller (`controllers/auth.py`)
+
+Handles authentication and authorization:
+
+- Login and logout
+- User registration
+- Password reset
+
+### Book Controller (`controllers/book.py`)
+
+Handles book-related operations:
+
+- Book listing, creation, editing, and deletion
+- Book search and filtering
+- Book import and export
+
+### Borrowing Controller (`controllers/borrowing.py`)
+
+Handles borrowing-related operations:
+
+- Borrowing and returning books
+- Managing overdue books
+- Calculating fines
+
+### Admin Controller (`controllers/admin.py`)
+
+Handles administrative operations:
+
+- User management
+- System configuration
+- Database backup and restoration
+
+### Report Controller (`controllers/report.py`)
+
+Handles report generation:
+
+- Statistical reports
+- Usage reports
+- Exporting reports
+
+## Setup and Installation
+
+1. Clone the repository
+2. Install dependencies: `pip install -r requirements.txt`
+3. Configure database settings in `.env` or `config.json`
+4. Initialize the database: `flask init-db`
+5. Run the application: `flask run`
+
+## Development
+
+- Use virtual environment for development
+- Follow PEP 8 style guidelines
+- Write tests for new features
+- Document code with docstrings
+
+## Deployment
+
+- Configure production settings
+- Set up a production WSGI server (Gunicorn, uWSGI)
+- Use a reverse proxy (Nginx, Apache)
+- Set up regular database backups
+- Configure logging for production
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+

@@ -1,0 +1,103 @@
+{% extends "layout.html" %}
+{% block title %}My Profile - Library Management System{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>My Profile</h2>
+        <p class="lead">View and update your account information</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">Profile Information</div>
+            <div class="card-body text-center">
+                {% if current_user.profile_image %}
+                <img src="{{ url_for('static', filename='images/profiles/' + current_user.profile_image) }}" alt="Profile Image" class="rounded-circle img-fluid mb-3" style="max-width: 150px;">
+                {% else %}
+                <img src="{{ url_for('static', filename='images/default-profile.png') }}" alt="Default Profile" class="rounded-circle img-fluid mb-3" style="max-width: 150px;">
+                {% endif %}
+                <h5 class="card-title">{{ current_user.full_name }}</h5>
+                <p class="card-text text-muted">@{{ current_user.username }}</p>
+                <p class="card-text">
+                    <span class="badge bg-primary">{{ current_user.role|capitalize }}</span>
+                </p>
+                <p class="card-text">Member since: {{ current_user.created_at|date }}</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Account Statistics</div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    Books Borrowed
+                    <span class="badge bg-primary rounded-pill">{{ stats.total_borrowed }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    Currently Borrowed
+                    <span class="badge bg-info rounded-pill">{{ stats.currently_borrowed }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    Overdue Books
+                    <span class="badge bg-danger rounded-pill">{{ stats.overdue }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    Active Reservations
+                    <span class="badge bg-warning text-dark rounded-pill">{{ stats.reservations }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    Unpaid Fines
+                    <span class="badge bg-danger rounded-pill">${{ stats.unpaid_fines }}</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">Edit Profile</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_profile') }}" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" value="{{ current_user.full_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ current_user.email }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="profile_image" class="form-label">Profile Image</label>
+                        <input type="file" class="form-control" id="profile_image" name="profile_image" accept="image/*">
+                        <div class="form-text">Leave empty to keep current image</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">Change Password</div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('change_password') }}">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Change Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
