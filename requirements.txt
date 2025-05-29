@@ -1,6 +1,32 @@
+# Updated requirements.txt
 Flask==2.3.3
 Flask-MySQLdb==1.0.1
 Flask-WTF==1.1.1
 Flask-Login==0.6.2
 Flask-Bcrypt==1.0.1
+Flask-Mail==0.9.1
 python-dotenv==1.0.0
+mysql-connector-python==8.1.0
+PyMySQL==1.1.0
+celery==5.3.1
+redis==4.6.0
+APScheduler==3.10.4
+pdfkit==1.0.0
+Pillow==10.0.0
+python-barcode==0.15.1
+qrcode==7.4.2
+openpyxl==3.1.2
+pandas==2.0.3
+sqlalchemy==2.0.20
+alembic==1.12.0
+marshmallow==3.20.1
+flask-restful==0.3.10
+flask-cors==4.0.0
+gunicorn==21.2.0
+
+# Additional packages for enhanced features
+flask-migrate==4.0.5
+flask-caching==2.1.0
+flask-limiter==3.5.0
+flask-compress==1.13.0
+flask-admin==1.6.1
