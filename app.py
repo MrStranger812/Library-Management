@@ -71,12 +71,6 @@ def logout():
 def dashboard():
     return render_template('dashboard.html')
 
-# API Routes for Books
-@app.route('/api/books', methods=['GET'])
-@login_required
-def get_books():
-    # Code to fetch books
-    pass
 
 @app.route('/api/books', methods=['POST'])
 @login_required
