@@ -1,0 +1,8 @@
+                    <div class="card-footer bg-transparent">
+                        <a href="{{ url_for('book_detail', book_id=book.book_id) }}" class="btn btn-outline-primary btn-sm">
+                            View Details
+                        </a>
+                        <a href="{{ url_for('book_reviews', book_id=book.book_id) }}" class="btn btn-outline-secondary btn-sm">
+                            Reviews ({{ book.reviews|length }})
+                        </a>
+                    </div> 

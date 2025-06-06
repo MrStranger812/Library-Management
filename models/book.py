@@ -62,6 +62,12 @@ class Book(db.Model):
             (cls.isbn.ilike(search_term))
         ).all()
 
+    @property
+    def average_rating(self):
+        if not self.reviews:
+            return 0
+        return sum(review.rating for review in self.reviews) / len(self.reviews)
+
     def to_dict(self):
         return {
             'book_id': self.book_id,
@@ -75,6 +81,7 @@ class Book(db.Model):
             'cover_image': self.cover_image,
             'total_copies': self.total_copies,
             'copies_available': self.copies_available,
+            'average_rating': self.average_rating,
             'authors': [{
                 'author_id': author.author_id,
                 'first_name': author.first_name,

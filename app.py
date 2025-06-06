@@ -39,6 +39,7 @@ from models.user_membership import UserMembership
 from models.user_permission import UserPermission
 from models.author import Author
 from models.book_author import BookAuthor
+from models.book_review import BookReview
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -784,6 +785,124 @@ def api_remove_book_author(book_id, author_id):
     
     try:
         db.session.delete(book_author)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# Author Routes
+@app.route('/authors')
+def authors():
+    query = request.args.get('q', '')
+    if query:
+        authors = Author.query.filter(
+            (Author.first_name.ilike(f'%{query}%')) |
+            (Author.last_name.ilike(f'%{query}%'))
+        ).all()
+    else:
+        authors = Author.query.all()
+    return render_template('authors/list.html', authors=authors)
+
+@app.route('/authors/<int:author_id>')
+def author_detail(author_id):
+    author = Author.query.get_or_404(author_id)
+    return render_template('authors/detail.html', author=author)
+
+# Book Review Routes
+@app.route('/api/books/<int:book_id>/reviews', methods=['GET'])
+def api_get_book_reviews(book_id):
+    reviews = BookReview.query.filter_by(book_id=book_id).order_by(BookReview.created_at.desc()).all()
+    return jsonify([review.to_dict() for review in reviews])
+
+@app.route('/api/books/<int:book_id>/reviews', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['rating'],
+    'properties': {
+        'rating': {'type': 'integer', 'minimum': 1, 'maximum': 5},
+        'review_text': {'type': 'string'}
+    }
+})
+def api_add_book_review(book_id):
+    book = Book.query.get_or_404(book_id)
+    data = request.get_json()
+    
+    # Check if user has already reviewed this book
+    existing_review = BookReview.query.filter_by(
+        book_id=book_id,
+        user_id=current_user.user_id
+    ).first()
+    
+    if existing_review:
+        return jsonify({
+            'success': False,
+            'message': 'You have already reviewed this book'
+        }), 400
+    
+    try:
+        review = BookReview(
+            book_id=book_id,
+            user_id=current_user.user_id,
+            rating=data['rating'],
+            review_text=data.get('review_text')
+        )
+        db.session.add(review)
+        db.session.commit()
+        return jsonify({'success': True, 'review': review.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/books/<int:book_id>/reviews/<int:review_id>', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['rating'],
+    'properties': {
+        'rating': {'type': 'integer', 'minimum': 1, 'maximum': 5},
+        'review_text': {'type': 'string'}
+    }
+})
+def api_update_book_review(book_id, review_id):
+    review = BookReview.query.filter_by(
+        book_id=book_id,
+        review_id=review_id,
+        user_id=current_user.user_id
+    ).first_or_404()
+    
+    data = request.get_json()
+    try:
+        review.rating = data['rating']
+        if 'review_text' in data:
+            review.review_text = data['review_text']
+        db.session.commit()
+        return jsonify({'success': True, 'review': review.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/books/<int:book_id>/reviews/<int:review_id>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_delete_book_review(book_id, review_id):
+    review = BookReview.query.filter_by(
+        book_id=book_id,
+        review_id=review_id,
+        user_id=current_user.user_id
+    ).first_or_404()
+    
+    try:
+        db.session.delete(review)
         db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
