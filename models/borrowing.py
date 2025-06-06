@@ -1,115 +1,119 @@
 # Borrowing model in models/borrowing.py
-from datetime import datetime, timedelta
+from extensions import db
+from datetime import datetime
 
-class Borrowing:
-    @staticmethod
-    def borrow_book(user_id, book_id, days=14):
-        cursor = mysql.connection.cursor()
-        
-        # Check if book is available
-        cursor.execute("SELECT copies_available FROM books WHERE book_id = %s", (book_id,))
-        book = cursor.fetchone()
-        
-        if not book or book[0] <= 0:
-            cursor.close()
-            return False, "Book not available for borrowing"
-        
-        # Create borrowing record
-        borrow_date = datetime.now().date()
-        due_date = borrow_date + timedelta(days=days)
-        
-        cursor.execute(
-            "INSERT INTO borrowings (user_id, book_id, borrow_date, due_date, status) VALUES (%s, %s, %s, %s, 'borrowed')",
-            (user_id, book_id, borrow_date, due_date)
-        )
-        
-        # Update book availability
-        cursor.execute(
-            "UPDATE books SET copies_available = copies_available - 1 WHERE book_id = %s",
-            (book_id,)
-        )
-        
-        mysql.connection.commit()
-        cursor.close()
-        return True, f"Book borrowed successfully. Due date: {due_date}"
+class Borrowing(db.Model):
+    __tablename__ = 'borrowings'
     
-    @staticmethod
-    def return_book(borrowing_id):
-        cursor = mysql.connection.cursor()
-        
-        # Check if borrowing exists and is not already returned
-        cursor.execute("""
-            SELECT b.borrowing_id, b.book_id, b.due_date, b.status 
-            FROM borrowings b 
-            WHERE b.borrowing_id = %s AND b.status = 'borrowed'
-        """, (borrowing_id,))
-        
-        borrowing = cursor.fetchone()
-        if not borrowing:
-            cursor.close()
-            return False, "Borrowing record not found or already returned"
-        
-        book_id = borrowing[1]
-        due_date = borrowing[2]
-        return_date = datetime.now().date()
-        
-        # Calculate fine if overdue
-        fine = 0.0
-        if return_date > due_date:
-            days_overdue = (return_date - due_date).days
-            fine = days_overdue * 0.50  # $0.50 per day overdue
-        
-        # Update borrowing record
-        cursor.execute(
-            "UPDATE borrowings SET return_date = %s, status = 'returned', fine = %s WHERE borrowing_id = %s",
-            (return_date, fine, borrowing_id)
-        )
-        
-        # Update book availability
-        cursor.execute(
-            "UPDATE books SET copies_available = copies_available + 1 WHERE book_id = %s",
-            (book_id,)
-        )
-        
-        mysql.connection.commit()
-        cursor.close()
-        
-        message = f"Book returned successfully."
-        if fine > 0:
-            message += f" Fine charged: ${fine:.2f}"
-        
-        return True, message
+    borrowing_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.book_id', ondelete='CASCADE'), nullable=False)
+    copy_id = db.Column(db.Integer, db.ForeignKey('book_copies.copy_id', ondelete='SET NULL'))
+    borrow_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    due_date = db.Column(db.DateTime, nullable=False)
+    return_date = db.Column(db.DateTime)
+    status = db.Column(db.Enum('borrowed', 'returned', 'overdue', 'lost'), default='borrowed')
+    fine_amount = db.Column(db.Numeric(10, 2), default=0)
+    notes = db.Column(db.Text)
+
+    # Relationships
+    user = db.relationship('User', backref='borrowings')
+    book = db.relationship('Book', backref='borrowings')
+    copy = db.relationship('BookCopy', backref='borrowings')
+    fine_payments = db.relationship('FinePayment', backref='borrowing', lazy=True)
+
+    def __init__(self, user_id, book_id, due_date, copy_id=None):
+        self.user_id = user_id
+        self.book_id = book_id
+        self.due_date = due_date
+        self.copy_id = copy_id
+
+    @classmethod
+    def get_by_id(cls, borrowing_id):
+        return cls.query.get(borrowing_id)
+
+    @classmethod
+    def get_user_borrowings(cls, user_id):
+        return cls.query.filter_by(user_id=user_id).all()
+
+    @classmethod
+    def get_overdue_borrowings(cls):
+        return cls.query.filter(
+            cls.status == 'borrowed',
+            cls.due_date < datetime.utcnow()
+        ).all()
+
+    def calculate_fine(self):
+        if self.status == 'borrowed' and self.due_date < datetime.utcnow():
+            days_overdue = (datetime.utcnow() - self.due_date).days
+            self.fine_amount = days_overdue * 1.0  # $1 per day
+            self.status = 'overdue'
+            db.session.commit()
+
+    def return_book(self):
+        self.return_date = datetime.utcnow()
+        self.status = 'returned'
+        if self.copy:
+            self.copy.is_available = True
+        db.session.commit()
+
+class FinePayment(db.Model):
+    __tablename__ = 'fine_payments'
     
-    @staticmethod
-    def get_user_borrowings(user_id):
-        cursor = mysql.connection.cursor()
-        cursor.execute("""
-            SELECT b.borrowing_id, b.borrow_date, b.due_date, b.return_date, b.status, b.fine,
-                   bk.book_id, bk.title, bk.author
-            FROM borrowings b
-            JOIN books bk ON b.book_id = bk.book_id
-            WHERE b.user_id = %s
-            ORDER BY 
-                CASE 
-                    WHEN b.status = 'borrowed' THEN 0
-                    WHEN b.status = 'overdue' THEN 1
-                    ELSE 2
-                END,
-                b.borrow_date DESC
-        """, (user_id,))
-        borrowings = cursor.fetchall()
-        cursor.close()
-        return borrowings
+    payment_id = db.Column(db.Integer, primary_key=True)
+    borrowing_id = db.Column(db.Integer, db.ForeignKey('borrowings.borrowing_id', ondelete='CASCADE'), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    payment_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    payment_method = db.Column(db.Enum('cash', 'credit_card', 'debit_card', 'online'), nullable=False)
+    transaction_id = db.Column(db.String(100))
+    notes = db.Column(db.Text)
+
+    def __init__(self, borrowing_id, amount, payment_method, transaction_id=None):
+        self.borrowing_id = borrowing_id
+        self.amount = amount
+        self.payment_method = payment_method
+        self.transaction_id = transaction_id
+
+class Reservation(db.Model):
+    __tablename__ = 'reservations'
     
-    @staticmethod
-    def update_overdue_status():
-        cursor = mysql.connection.cursor()
-        today = datetime.now().date()
-        
-        cursor.execute(
-            "UPDATE borrowings SET status = 'overdue' WHERE due_date < %s AND status = 'borrowed'",
-            (today,)
-        )
-        
-        mysql.connection.commit()
-        cursor.close()
+    reservation_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.book_id', ondelete='CASCADE'), nullable=False)
+    reservation_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expiry_date = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.Enum('pending', 'fulfilled', 'expired', 'cancelled'), default='pending')
+    priority = db.Column(db.Integer, default=1)
+    notes = db.Column(db.Text)
+
+    # Relationships
+    user = db.relationship('User', backref='reservations')
+    book = db.relationship('Book', backref='reservations')
+
+    def __init__(self, user_id, book_id, expiry_date):
+        self.user_id = user_id
+        self.book_id = book_id
+        self.expiry_date = expiry_date
+
+    @classmethod
+    def get_by_id(cls, reservation_id):
+        return cls.query.get(reservation_id)
+
+    @classmethod
+    def get_user_reservations(cls, user_id):
+        return cls.query.filter_by(user_id=user_id).all()
+
+    @classmethod
+    def get_pending_reservations(cls, book_id):
+        return cls.query.filter_by(
+            book_id=book_id,
+            status='pending'
+        ).order_by(cls.priority.desc(), cls.reservation_date.asc()).all()
+
+    def cancel(self):
+        self.status = 'cancelled'
+        db.session.commit()
+
+    def fulfill(self):
+        self.status = 'fulfilled'
+        db.session.commit()

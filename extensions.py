@@ -1,7 +1,7 @@
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager
 
-mysql = MySQL()
+db = SQLAlchemy()
 bcrypt = Bcrypt()
 login_manager = LoginManager()

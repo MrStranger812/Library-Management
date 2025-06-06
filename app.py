@@ -1,27 +1,44 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from flask_mysqldb import MySQL
+from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
-from config import Config
+from database import config as db_config
 import os
-from extensions import mysql, bcrypt, login_manager
+from extensions import bcrypt, login_manager
 from utils.security import Security
 from utils.middleware import security_headers, validate_request, require_https, validate_json_schema, log_request, handle_cors
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.config.from_object(Config)
 
-# Initialize extensions
-mysql.init_app(app)
+# Load SQLAlchemy config from database/config.py
+app.config['SQLALCHEMY_DATABASE_URI'] = db_config.SQLALCHEMY_DATABASE_URI
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = db_config.SQLALCHEMY_TRACK_MODIFICATIONS
+app.config['SQLALCHEMY_ECHO'] = db_config.SQLALCHEMY_ECHO
+app.config.update(db_config.SQLALCHEMY_ENGINE_OPTIONS)
+
+# Initialize SQLAlchemy
+# Make db available for models
+from flask_sqlalchemy import SQLAlchemy
+
+# Create the SQLAlchemy db instance
+# (This should be imported in your models as well)
+db = SQLAlchemy(app)
+
+# Initialize other extensions
 bcrypt.init_app(app)
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Import models
+# Import models (update these to use SQLAlchemy in the next step)
 from models.user import User
 from models.book import Book
 from models.borrowing import Borrowing
 from models.user import Permission
+from models.user_membership import UserMembership
+from models.user_permission import UserPermission
+from models.author import Author
+from models.book_author import BookAuthor
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -112,14 +129,18 @@ def dashboard():
 @security_headers()
 @validate_json_schema({
     'type': 'object',
-    'required': ['isbn', 'title', 'author', 'category'],
+    'required': ['isbn', 'title', 'author', 'category_id'],
     'properties': {
         'isbn': {'type': 'string'},
         'title': {'type': 'string'},
         'author': {'type': 'string'},
-        'category': {'type': 'string'},
-        'publicationYear': {'type': 'integer'},
-        'copies': {'type': 'integer', 'minimum': 1}
+        'category_id': {'type': 'integer'},
+        'publisher_id': {'type': 'integer'},
+        'publication_year': {'type': 'integer'},
+        'description': {'type': 'string'},
+        'page_count': {'type': 'integer'},
+        'language': {'type': 'string'},
+        'total_copies': {'type': 'integer', 'minimum': 1}
     }
 })
 def api_add_book():
@@ -129,16 +150,24 @@ def api_add_book():
     data = request.get_json()
     
     try:
-        book_id = Book.create(
-            data['isbn'],
-            data['title'],
-            data['author'],
-            data['category'],
-            data.get('publicationYear'),
-            int(data.get('copies', 1))
+        book = Book(
+            isbn=data['isbn'],
+            title=data['title'],
+            author=data['author'],
+            category_id=data['category_id'],
+            publisher_id=data.get('publisher_id'),
+            publication_year=data.get('publication_year'),
+            description=data.get('description'),
+            page_count=data.get('page_count'),
+            language=data.get('language', 'English'),
+            total_copies=data.get('total_copies', 1)
         )
-        return jsonify({'success': True, 'book_id': book_id})
+        book.added_by = current_user.user_id
+        db.session.add(book)
+        db.session.commit()
+        return jsonify({'success': True, 'book_id': book.book_id})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/books', methods=['GET'])
@@ -149,21 +178,7 @@ def api_get_books():
     else:
         books = Book.get_all()
     
-    # Convert books to JSON-friendly format
-    books_list = []
-    for book in books:
-        books_list.append({
-            'book_id': book[0],
-            'isbn': book[1],
-            'title': book[2],
-            'author': book[3],
-            'category': book[4],
-            'publication_year': book[5],
-            'copies_available': book[6],
-            'total_copies': book[7]
-        })
-    
-    return jsonify(books_list)
+    return jsonify([book.to_dict() for book in books])
 
 @app.route('/api/books/<int:book_id>', methods=['GET'])
 def api_get_book(book_id):
@@ -171,18 +186,44 @@ def api_get_book(book_id):
     if not book:
         return jsonify({'error': 'Book not found'}), 404
     
-    book_data = {
-        'book_id': book[0],
-        'isbn': book[1],
-        'title': book[2],
-        'author': book[3],
-        'category': book[4],
-        'publication_year': book[5],
-        'copies_available': book[6],
-        'total_copies': book[7]
+    return jsonify(book.to_dict())
+
+@app.route('/api/books/<int:book_id>', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'properties': {
+        'title': {'type': 'string'},
+        'author': {'type': 'string'},
+        'category_id': {'type': 'integer'},
+        'publisher_id': {'type': 'integer'},
+        'publication_year': {'type': 'integer'},
+        'description': {'type': 'string'},
+        'page_count': {'type': 'integer'},
+        'language': {'type': 'string'},
+        'total_copies': {'type': 'integer', 'minimum': 1}
     }
+})
+def api_update_book(book_id):
+    if not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
-    return jsonify(book_data)
+    book = Book.get_by_id(book_id)
+    if not book:
+        return jsonify({'error': 'Book not found'}), 404
+    
+    data = request.get_json()
+    try:
+        for key, value in data.items():
+            setattr(book, key, value)
+        db.session.commit()
+        return jsonify({'success': True, 'book': book.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/books/<int:book_id>', methods=['DELETE'])
 @login_required
@@ -193,10 +234,16 @@ def api_delete_book(book_id):
     if not current_user.has_permission('manage_books'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
+    book = Book.get_by_id(book_id)
+    if not book:
+        return jsonify({'error': 'Book not found'}), 404
+    
     try:
-        Book.delete(book_id)
+        db.session.delete(book)
+        db.session.commit()
         return jsonify({'success': True})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/users', methods=['GET'])
@@ -206,10 +253,18 @@ def api_delete_book(book_id):
 @security_headers()
 def api_get_users():
     if not current_user.has_permission('manage_users'):
-        return jsonify({'error': 'Permission denied'}), 403
-    
-    users = User.get_all()
-    return jsonify(users)
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    users = User.query.all()
+    return jsonify([{
+        'user_id': user.user_id,
+        'username': user.username,
+        'email': user.email,
+        'full_name': user.full_name,
+        'role': user.role,
+        'created_at': user.created_at.isoformat(),
+        'last_login': user.last_login.isoformat() if user.last_login else None
+    } for user in users])
 
 @app.route('/api/users', methods=['POST'])
 @login_required
@@ -230,24 +285,49 @@ def api_get_users():
 def api_add_user():
     if not current_user.has_permission('manage_users'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
+
     data = request.get_json()
-    
-    # Validate password
-    is_valid, message = Security.validate_password(data['password'])
-    if not is_valid:
-        return jsonify({'success': False, 'message': message}), 400
-    
+
+    # Check if username or email already exists
+    if User.get_by_username(data['username']):
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
+    if User.get_by_email(data['email']):
+        return jsonify({'success': False, 'message': 'Email already exists'}), 400
+
     try:
-        user_id = User.create(
-            data['username'],
-            data['password'],
-            data['full_name'],
-            data['email'],
-            data['role']
+        user = User(
+            username=data['username'],
+            email=data['email'],
+            full_name=data['full_name'],
+            role=data['role']
         )
-        return jsonify({'success': True, 'user_id': user_id})
+        user.set_password(data['password'])
+        db.session.add(user)
+        db.session.commit()
+
+        # Assign default permissions based on role
+        if data['role'] == 'admin':
+            permissions = Permission.query.all()
+        elif data['role'] == 'librarian':
+            permissions = Permission.query.filter(Permission.name.in_(['manage_books', 'manage_borrowings'])).all()
+        else:  # member
+            permissions = Permission.query.filter_by(name='borrow_books').all()
+
+        for permission in permissions:
+            user_permission = UserPermission(
+                user_id=user.user_id,
+                permission_id=permission.permission_id
+            )
+            db.session.add(user_permission)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'user_id': user.user_id,
+            'message': 'User created successfully'
+        })
     except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/borrowings/borrow', methods=['POST'])
@@ -264,19 +344,52 @@ def api_add_user():
     }
 })
 def api_borrow_book():
-    if not current_user.has_permission('borrow_books'):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
     data = request.get_json()
     book_id = data['book_id']
     days = data.get('days', 14)
-    
-    success, message = Borrowing.borrow_book(current_user.id, book_id, days)
-    
-    return jsonify({
-        'success': success,
-        'message': message
-    })
+
+    # Get user's active membership
+    membership = UserMembership.get_active_membership(current_user.user_id)
+    if not membership:
+        return jsonify({'success': False, 'message': 'No active membership found'}), 400
+
+    # Check if user has reached their borrowing limit
+    active_borrowings = Borrowing.query.filter_by(
+        user_id=current_user.user_id,
+        status='borrowed'
+    ).count()
+    if active_borrowings >= membership.membership_type.max_books:
+        return jsonify({'success': False, 'message': 'Borrowing limit reached'}), 400
+
+    # Get book and check availability
+    book = Book.get_by_id(book_id)
+    if not book:
+        return jsonify({'success': False, 'message': 'Book not found'}), 404
+    if book.copies_available <= 0:
+        return jsonify({'success': False, 'message': 'Book not available for borrowing'}), 400
+
+    try:
+        # Create borrowing record
+        due_date = datetime.utcnow() + timedelta(days=days)
+        borrowing = Borrowing(
+            user_id=current_user.user_id,
+            book_id=book_id,
+            due_date=due_date
+        )
+        db.session.add(borrowing)
+
+        # Update book availability
+        book.copies_available -= 1
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'borrowing_id': borrowing.borrowing_id,
+            'due_date': due_date.isoformat()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/borrowings/return', methods=['POST'])
 @login_required
@@ -291,100 +404,391 @@ def api_borrow_book():
     }
 })
 def api_return_book():
-    if not current_user.has_permission('return_books'):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
     data = request.get_json()
     borrowing_id = data['borrowing_id']
-    
-    success, message = Borrowing.return_book(borrowing_id)
-    
-    return jsonify({
-        'success': success,
-        'message': message
-    })
+
+    borrowing = Borrowing.get_by_id(borrowing_id)
+    if not borrowing:
+        return jsonify({'success': False, 'message': 'Borrowing record not found'}), 404
+    if borrowing.user_id != current_user.user_id and not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    if borrowing.status != 'borrowed':
+        return jsonify({'success': False, 'message': 'Book already returned'}), 400
+
+    try:
+        # Calculate fine if overdue
+        borrowing.calculate_fine()
+
+        # Return the book
+        borrowing.return_book()
+
+        # Update book availability
+        book = borrowing.book
+        book.copies_available += 1
+        db.session.commit()
+
+        response = {'success': True}
+        if borrowing.fine_amount > 0:
+            response['fine_amount'] = float(borrowing.fine_amount)
+        return jsonify(response)
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/borrowings/user', methods=['GET'])
 @login_required
 def api_get_user_borrowings():
-    user_id = request.args.get('user_id')
-    
-    # If requesting other user's borrowings, check permission
-    if user_id and int(user_id) != current_user.id and not current_user.has_permission('manage_users'):
-        return jsonify({'error': 'Permission denied'}), 403
-    
-    # If no user_id specified, use current user
-    if not user_id:
-        user_id = current_user.id
-    
-    borrowings = Borrowing.get_user_borrowings(user_id)
-    
-    # Convert borrowings to JSON-friendly format
-    borrowings_list = []
-    for borrowing in borrowings:
-        borrowings_list.append({
-            'borrowing_id': borrowing[0],
-            'book_id': borrowing[1],
-            'user_id': borrowing[2],
-            'borrow_date': borrowing[3],
-            'return_date': borrowing[4],
-            'returned': borrowing[5]
-        })
-    
-    return jsonify(borrowings_list)
+    borrowings = Borrowing.get_user_borrowings(current_user.user_id)
+    return jsonify([{
+        'borrowing_id': b.borrowing_id,
+        'book': b.book.to_dict(),
+        'borrow_date': b.borrow_date.isoformat(),
+        'due_date': b.due_date.isoformat(),
+        'return_date': b.return_date.isoformat() if b.return_date else None,
+        'status': b.status,
+        'fine_amount': float(b.fine_amount) if b.fine_amount else 0
+    } for b in borrowings])
+
+@app.route('/api/borrowings/overdue', methods=['GET'])
+@login_required
+@Security.require_api_key()
+def api_get_overdue_borrowings():
+    if not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    borrowings = Borrowing.get_overdue_borrowings()
+    return jsonify([{
+        'borrowing_id': b.borrowing_id,
+        'user': {
+            'user_id': b.user.user_id,
+            'username': b.user.username,
+            'email': b.user.email
+        },
+        'book': b.book.to_dict(),
+        'borrow_date': b.borrow_date.isoformat(),
+        'due_date': b.due_date.isoformat(),
+        'days_overdue': (datetime.utcnow() - b.due_date).days,
+        'fine_amount': float(b.fine_amount) if b.fine_amount else 0
+    } for b in borrowings])
 
 @app.route('/api/permissions', methods=['GET'])
 @login_required
 def api_get_permissions():
-    if not current_user.has_permission('manage_permissions'):
-        return jsonify({'error': 'Permission denied'}), 403
-    
-    permissions = Permission.get_all()
-    
-    # Convert to JSON-friendly format
-    permissions_list = []
-    for permission in permissions:
-        permissions_list.append({
-            'permission_id': permission[0],
-            'name': permission[1],
-            'description': permission[2] if len(permission) > 2 else ''
-        })
-    
-    return jsonify(permissions_list)
+    if not current_user.has_permission('manage_users'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    permissions = Permission.query.all()
+    return jsonify([{
+        'permission_id': p.permission_id,
+        'name': p.name,
+        'description': p.description
+    } for p in permissions])
 
 @app.route('/api/permissions/grant', methods=['POST'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['user_id', 'permission_id'],
+    'properties': {
+        'user_id': {'type': 'integer'},
+        'permission_id': {'type': 'integer'}
+    }
+})
 def api_grant_permission():
-    if not current_user.has_permission('manage_permissions'):
+    if not current_user.has_permission('manage_users'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
+
     data = request.get_json()
-    user_id = data.get('user_id')
-    permission_id = data.get('permission_id')
-    
-    success, message = Permission.grant(user_id, permission_id, current_user.id)
-    
-    return jsonify({
-        'success': success,
-        'message': message
-    })
+    user_id = data['user_id']
+    permission_id = data['permission_id']
+
+    # Check if user and permission exist
+    user = User.get_by_id(user_id)
+    permission = Permission.query.get(permission_id)
+    if not user or not permission:
+        return jsonify({'success': False, 'message': 'User or permission not found'}), 404
+
+    # Check if permission is already granted
+    existing = UserPermission.query.filter_by(
+        user_id=user_id,
+        permission_id=permission_id
+    ).first()
+    if existing:
+        return jsonify({'success': False, 'message': 'Permission already granted'}), 400
+
+    try:
+        user_permission = UserPermission(
+            user_id=user_id,
+            permission_id=permission_id
+        )
+        db.session.add(user_permission)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Permission granted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/permissions/revoke', methods=['POST'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['user_id', 'permission_id'],
+    'properties': {
+        'user_id': {'type': 'integer'},
+        'permission_id': {'type': 'integer'}
+    }
+})
 def api_revoke_permission():
-    if not current_user.has_permission('manage_permissions'):
+    if not current_user.has_permission('manage_users'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    data = request.get_json()
+    user_id = data['user_id']
+    permission_id = data['permission_id']
+
+    # Check if user and permission exist
+    user = User.get_by_id(user_id)
+    permission = Permission.query.get(permission_id)
+    if not user or not permission:
+        return jsonify({'success': False, 'message': 'User or permission not found'}), 404
+
+    # Check if permission is granted
+    user_permission = UserPermission.query.filter_by(
+        user_id=user_id,
+        permission_id=permission_id
+    ).first()
+    if not user_permission:
+        return jsonify({'success': False, 'message': 'Permission not granted'}), 400
+
+    try:
+        db.session.delete(user_permission)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Permission revoked successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# Author Management Routes
+@app.route('/api/authors', methods=['GET'])
+def api_get_authors():
+    query = request.args.get('q', '')
+    if query:
+        authors = Author.query.filter(
+            (Author.first_name.ilike(f'%{query}%')) |
+            (Author.last_name.ilike(f'%{query}%'))
+        ).all()
+    else:
+        authors = Author.query.all()
+    
+    return jsonify([{
+        'author_id': author.author_id,
+        'first_name': author.first_name,
+        'last_name': author.last_name,
+        'biography': author.biography,
+        'birth_date': author.birth_date.isoformat() if author.birth_date else None,
+        'death_date': author.death_date.isoformat() if author.death_date else None,
+        'nationality': author.nationality,
+        'books': [book.to_dict() for book in author.books]
+    } for author in authors])
+
+@app.route('/api/authors', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['first_name', 'last_name'],
+    'properties': {
+        'first_name': {'type': 'string'},
+        'last_name': {'type': 'string'},
+        'biography': {'type': 'string'},
+        'birth_date': {'type': 'string', 'format': 'date'},
+        'death_date': {'type': 'string', 'format': 'date'},
+        'nationality': {'type': 'string'}
+    }
+})
+def api_add_author():
+    if not current_user.has_permission('manage_books'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
     data = request.get_json()
-    user_id = data.get('user_id')
-    permission_id = data.get('permission_id')
-    
-    success, message = Permission.revoke(user_id, permission_id)
+    try:
+        author = Author(
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            biography=data.get('biography'),
+            birth_date=datetime.strptime(data['birth_date'], '%Y-%m-%d').date() if data.get('birth_date') else None,
+            death_date=datetime.strptime(data['death_date'], '%Y-%m-%d').date() if data.get('death_date') else None,
+            nationality=data.get('nationality')
+        )
+        db.session.add(author)
+        db.session.commit()
+        return jsonify({'success': True, 'author_id': author.author_id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/authors/<int:author_id>', methods=['GET'])
+def api_get_author(author_id):
+    author = Author.query.get(author_id)
+    if not author:
+        return jsonify({'error': 'Author not found'}), 404
     
     return jsonify({
-        'success': success,
-        'message': message
+        'author_id': author.author_id,
+        'first_name': author.first_name,
+        'last_name': author.last_name,
+        'biography': author.biography,
+        'birth_date': author.birth_date.isoformat() if author.birth_date else None,
+        'death_date': author.death_date.isoformat() if author.death_date else None,
+        'nationality': author.nationality,
+        'books': [book.to_dict() for book in author.books]
     })
+
+@app.route('/api/authors/<int:author_id>', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'properties': {
+        'first_name': {'type': 'string'},
+        'last_name': {'type': 'string'},
+        'biography': {'type': 'string'},
+        'birth_date': {'type': 'string', 'format': 'date'},
+        'death_date': {'type': 'string', 'format': 'date'},
+        'nationality': {'type': 'string'}
+    }
+})
+def api_update_author(author_id):
+    if not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    author = Author.query.get(author_id)
+    if not author:
+        return jsonify({'error': 'Author not found'}), 404
+    
+    data = request.get_json()
+    try:
+        if 'first_name' in data:
+            author.first_name = data['first_name']
+        if 'last_name' in data:
+            author.last_name = data['last_name']
+        if 'biography' in data:
+            author.biography = data['biography']
+        if 'birth_date' in data:
+            author.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date() if data['birth_date'] else None
+        if 'death_date' in data:
+            author.death_date = datetime.strptime(data['death_date'], '%Y-%m-%d').date() if data['death_date'] else None
+        if 'nationality' in data:
+            author.nationality = data['nationality']
+        
+        db.session.commit()
+        return jsonify({'success': True, 'author': {
+            'author_id': author.author_id,
+            'first_name': author.first_name,
+            'last_name': author.last_name,
+            'biography': author.biography,
+            'birth_date': author.birth_date.isoformat() if author.birth_date else None,
+            'death_date': author.death_date.isoformat() if author.death_date else None,
+            'nationality': author.nationality
+        }})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/authors/<int:author_id>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_delete_author(author_id):
+    if not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    author = Author.query.get(author_id)
+    if not author:
+        return jsonify({'error': 'Author not found'}), 404
+    
+    try:
+        db.session.delete(author)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/books/<int:book_id>/authors', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['author_id'],
+    'properties': {
+        'author_id': {'type': 'integer'},
+        'role': {'type': 'string', 'enum': ['author', 'co-author', 'editor', 'translator']}
+    }
+})
+def api_add_book_author(book_id):
+    if not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    book = Book.query.get(book_id)
+    if not book:
+        return jsonify({'error': 'Book not found'}), 404
+    
+    data = request.get_json()
+    author = Author.query.get(data['author_id'])
+    if not author:
+        return jsonify({'error': 'Author not found'}), 404
+    
+    try:
+        book_author = BookAuthor(
+            book_id=book_id,
+            author_id=data['author_id'],
+            role=data.get('role', 'author')
+        )
+        db.session.add(book_author)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/books/<int:book_id>/authors/<int:author_id>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_remove_book_author(book_id, author_id):
+    if not current_user.has_permission('manage_books'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    book_author = BookAuthor.query.filter_by(
+        book_id=book_id,
+        author_id=author_id
+    ).first()
+    
+    if not book_author:
+        return jsonify({'error': 'Book-Author relationship not found'}), 404
+    
+    try:
+        db.session.delete(book_author)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=Config.DEBUG)
