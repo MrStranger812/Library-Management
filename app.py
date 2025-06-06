@@ -8,8 +8,7 @@ from extensions import bcrypt, login_manager
 from utils.security import Security
 from utils.middleware import security_headers, validate_request, require_https, validate_json_schema, log_request, handle_cors
 from datetime import datetime, timedelta
-from flask_expects_json import expects_json
-from flask_expects_json.exceptions import ValidationError
+from flask_expects_json import ValidationError
 
 app = Flask(__name__)
 
