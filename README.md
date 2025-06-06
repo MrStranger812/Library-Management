@@ -23,6 +23,30 @@ The application follows a Model-View-Controller (MVC) architecture:
 - Database backup and restoration
 - Notification system for users and administrators
 
+## Security Features
+
+### Authentication & Authorization
+- Secure password hashing using Bcrypt
+- Session management with Flask-Login
+- Role-based access control (Admin, Librarian, Member)
+- CSRF protection for all forms
+- Secure session configuration with HTTP-only cookies
+- Account lockout after multiple failed login attempts
+
+### API Security
+- Rate limiting for API endpoints
+- API key authentication for external access
+- Request validation and sanitization
+- Secure headers implementation
+- Input validation middleware
+
+### Data Security
+- SQL injection prevention using parameterized queries
+- XSS protection through template escaping
+- Secure file upload handling
+- Audit logging for sensitive operations
+- Data encryption for sensitive information
+
 ## Database Schema
 
 ### Database Creation
@@ -315,178 +339,189 @@ Library Management System/
 ├── utils/                  # Utility modules
 └── tests/                  # Test cases
 ```
-Utility Modules
-Export Utility (utils/export.py)
-Provides functionality to export data in various formats:
 
-export_to_csv(): Exports data to CSV format for download
-export_to_pdf(): Exports data to PDF format for download
-These functions take data (as lists of dictionaries or tuples), format it appropriately, and return Flask response objects with the correct headers for file downloads.
+## Utility Modules
 
-Database Manager (utils/db_manager.py)
-Manages database connections and provides helper functions for database operations:
+### Core Utilities
+- **Security** (`utils/security.py`): Authentication, authorization, and security features
+- **Logger** (`utils/logger.py`): Logging functionality with rotation
+- **Cache** (`utils/cache.py`): In-memory caching with TTL support
+- **Database** (`utils/db_manager.py`): Database connection and query management
+- **Configuration** (`utils/config_manager.py`): Environment and config management
 
-get_db_cursor(): Context manager for database cursor
-execute_query(): Executes SELECT queries and returns results
-execute_update(): Executes INSERT/UPDATE/DELETE queries
-insert_and_get_id(): Inserts a record and returns the new ID
-This module simplifies database operations and ensures proper connection handling.
+### Data Management
+- **Export** (`utils/export.py`): Data export to CSV and PDF formats
+- **Backup** (`utils/backup.py`): Database backup and restoration
+- **File Upload** (`utils/file_upload.py`): Secure file handling
+- **Pagination** (`utils/pagination.py`): List pagination utilities
 
-Configuration Manager (utils/config_manager.py)
-Manages application configuration from environment variables and config files:
+### Business Logic
+- **Search** (`utils/search.py`): Advanced search functionality
+- **Statistics** (`utils/statistics.py`): Report generation
+- **Scheduler** (`utils/scheduler.py`): Background task management
+- **Validator** (`utils/validator.py`): Input validation and sanitization
 
-get(): Retrieves configuration values
-set(): Sets configuration values
-save_to_file(): Saves configuration to file
-Implements the singleton pattern to ensure consistent configuration across the application.
+## Models
 
-Logger (utils/logger.py)
-Provides logging functionality with different log levels and output destinations:
+### User Management
+- **User** (`models/user.py`): User authentication and profile management
+- **Notification** (`models/notification.py`): User notification system
 
-get_logger(): Returns a configured logger for a specific component
-Supports file and console logging
-Implements log rotation to manage log file sizes
-Error Handler (utils/error_handler.py)
-Centralizes error handling for the application:
+### Book Management
+- **Book** (`models/book.py`): Book catalog and inventory
+- **Borrowing** (`models/borrowing.py`): Book borrowing and returns
 
-register_error_handlers(): Registers error handlers with Flask
-Provides consistent error responses for different error types
-Supports both HTML and JSON responses based on request type
-Scheduler (utils/scheduler.py)
-Manages background tasks and scheduled jobs:
+## Controllers
 
-start(): Starts the scheduler in a background thread
-stop(): Stops the scheduler
-add_job(): Adds a new job to the scheduler
-Includes predefined jobs for due date notifications and overdue book status updates
-Backup Utility (utils/backup.py)
-Provides database backup and restoration functionality:
+### Authentication
+- **Auth** (`controllers/auth.py`): Login, registration, and password management
 
-create_database_backup(): Creates a backup of the database
-restore_database_backup(): Restores the database from a backup
-list_backups(): Lists available database backups with metadata
-This module ensures data safety through regular backups and provides disaster recovery capabilities.
+### Book Operations
+- **Book** (`controllers/book.py`): Book CRUD operations and search
 
-Pagination Utility (utils/pagination.py)
-Handles pagination for lists of items:
+### Administrative
+- **Admin** (`controllers/admin.py`): System configuration and user management
+- **Report** (`controllers/report.py`): Statistical reports and exports
 
-Pagination class: Manages pagination state and calculations
-get_pagination_args(): Extracts pagination parameters from requests
-iter_pages(): Generates page numbers for pagination UI
-Search Utility (utils/search.py)
-Provides advanced search functionality:
+## Project Structure
+```
+Library Management System/
+├── app.py                  # Main application entry point
+├── config.py              # Configuration settings
+├── requirements.txt       # Python dependencies
+├── backups/              # Database backup files
+├── logs/                 # Application logs
+├── models/               # Data models
+│   ├── user.py          # User model and authentication
+│   ├── book.py          # Book model and operations
+│   └── borrowing.py     # Borrowing model and logic
+├── controllers/          # Request handlers
+│   ├── auth.py          # Authentication controller
+│   ├── book.py          # Book management controller
+│   └── admin.py         # Admin operations controller
+├── static/              # Static assets (CSS, JS, images)
+├── templates/           # HTML templates
+├── utils/               # Utility modules
+│   ├── security.py      # Security utilities
+│   ├── logger.py        # Logging utilities
+│   └── validator.py     # Input validation
+└── tests/               # Test cases
+```
 
-search_books(): Searches books with filters and sorting
-search_users(): Searches users with filters and sorting
-get_book_categories(): Gets all unique book categories
-Statistics Utility (utils/statistics.py)
-Generates statistics and reports:
+## Setup and Installation
 
-get_dashboard_stats(): Gets statistics for the dashboard
-get_borrowing_stats(): Gets borrowing statistics for a specific period
-Cache Utility (utils/cache.py)
-Provides in-memory caching:
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/library-management.git
+cd library-management
+```
 
-get(): Retrieves a value from cache
-set(): Stores a value in cache with optional TTL
-delete(): Removes a value from cache
-clear(): Clears all cache
-cached(): Decorator for caching function results
-Security Utility (utils/security.py)
-Implements security features:
+2. Create and activate virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-generate_token(): Generates secure random tokens
-hash_data(): Hashes data with optional salt
-verify_hash(): Verifies data against a hash
-rate_limit(): Implements rate limiting
-check_ip_rate_limit(): Checks rate limit for current IP address
-File Upload Utility (utils/file_upload.py)
-Handles file uploads:
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-save_file(): Saves uploaded files with validation
-delete_file(): Deletes files
-allowed_file(): Checks if file extension is allowed
-Validator (utils/validator.py)
-Provides validation functions:
+4. Configure environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
 
-validate_email(): Validates email format
-validate_password(): Validates password strength
-validate_isbn(): Validates ISBN format
-validate_date(): Validates date format
-sanitize_input(): Sanitizes input to prevent injection attacks
-Models
-User Model (models/user.py)
-Manages user data and authentication:
+5. Initialize the database:
+```bash
+flask init-db
+```
 
-User registration, login, and profile management
-Password hashing and verification
-Role-based permissions
-Book Model (models/book.py)
-Manages book data:
+6. Run the application:
+```bash
+flask run
+```
 
-Book creation, updating, and deletion
-Book availability tracking
-Book search and filtering
-Borrowing Model (models/borrowing.py)
-Manages book borrowing:
+## Development Guidelines
 
-Borrowing and returning books
-Due date tracking
-Overdue status and fine calculation
-Notification Model (models/notification.py)
-Manages user notifications:
+### Code Style
+- Follow PEP 8 style guidelines
+- Use meaningful variable and function names
+- Add docstrings for all functions and classes
+- Keep functions small and focused
 
-Creating notifications
-Marking notifications as read
-Notification delivery
-Controllers
-Auth Controller (controllers/auth.py)
-Handles authentication and authorization:
+### Testing
+- Write unit tests for new features
+- Maintain test coverage above 80%
+- Run tests before committing changes
+- Use pytest for testing
 
-Login and logout
-User registration
-Password reset
-Book Controller (controllers/book.py)
-Handles book-related operations:
+### Security Best Practices
+- Never commit sensitive data
+- Use environment variables for secrets
+- Validate all user input
+- Keep dependencies updated
+- Follow OWASP security guidelines
 
-Book listing, creation, editing, and deletion
-Book search and filtering
-Book import and export
-Borrowing Controller (controllers/borrowing.py)
-Handles borrowing-related operations:
+## Deployment
 
-Borrowing and returning books
-Managing overdue books
-Calculating fines
-Admin Controller (controllers/admin.py)
-Handles administrative operations:
+### Production Setup
+1. Configure production settings in `.env`
+2. Set up a production WSGI server (Gunicorn/uWSGI)
+3. Configure reverse proxy (Nginx/Apache)
+4. Set up SSL/TLS certificates
+5. Configure database backups
 
-User management
-System configuration
-Database backup and restoration
-Report Controller (controllers/report.py)
-Handles report generation:
+### Monitoring
+- Set up application monitoring
+- Configure error tracking
+- Monitor system resources
+- Set up alerting for critical issues
 
-Statistical reports
-Usage reports
-Exporting reports
-Setup and Installation
-Clone the repository
-Install dependencies: pip install -r requirements.txt
-Configure database settings in .env or config.json
-Initialize the database: flask init-db
-Run the application: flask run
-Development
-Use virtual environment for development
-Follow PEP 8 style guidelines
-Write tests for new features
-Document code with docstrings
-Deployment
-Configure production settings
-Set up a production WSGI server (Gunicorn, uWSGI)
-Use a reverse proxy (Nginx, Apache)
-Set up regular database backups
-Configure logging for production
-License
-This project is licensed under the MIT License - see the LICENSE file for details.
+### Backup Strategy
+- Daily database backups
+- Weekly full system backups
+- Off-site backup storage
+- Regular backup testing
+
+## API Documentation
+
+### Authentication
+All API endpoints require authentication using either:
+- Session cookie for web interface
+- API key for external access
+
+### Rate Limiting
+- 100 requests per hour per IP
+- 1000 requests per hour per API key
+
+### Endpoints
+[API endpoints documentation...]
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For support, please:
+1. Check the documentation
+2. Search existing issues
+3. Create a new issue if needed
+
+## Acknowledgments
+
+- Flask framework
+- MySQL database
+- Bootstrap for UI
+- All contributors
 

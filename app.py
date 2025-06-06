@@ -5,16 +5,19 @@ from flask_bcrypt import Bcrypt
 from config import Config
 import os
 from extensions import mysql, bcrypt, login_manager
+from utils.security import Security
+from utils.middleware import security_headers, validate_request, require_https, validate_json_schema, log_request, handle_cors
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-
+# Initialize extensions
 mysql.init_app(app)
 bcrypt.init_app(app)
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# Import models
 from models.user import User
 from models.book import Book
 from models.borrowing import Borrowing
@@ -24,65 +27,120 @@ from models.user import Permission
 def load_user(user_id):
     return User.get_by_id(user_id)
 
+# Apply security middleware to all routes
+@app.before_request
+def before_request():
+    Security.check_ip_rate_limit()
+
 # Routes
 @app.route('/register', methods=['GET', 'POST'])
+@validate_request()
+@security_headers()
 def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         full_name = request.form['full_name']
         email = request.form['email']
+        
+        # Validate password
+        is_valid, message = Security.validate_password(password)
+        if not is_valid:
+            flash(message, 'danger')
+            return render_template('register.html')
+        
         # Check if user already exists
         if User.get_by_username(username):
             flash('Username already exists', 'danger')
             return render_template('register.html')
-        # Create user with default role (e.g., 'user')
-        User.create(username, password, full_name, email, 'user')
+        
+        # Create user with default role
+        User.create(username, password, full_name, email, 'member')
         flash('Registration successful. Please log in.', 'success')
         return redirect(url_for('login'))
+    
     return render_template('register.html')
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+@validate_request()
+@security_headers()
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        
+        # Check for account lockout
+        is_locked, message = Security.check_login_attempts(username)
+        if is_locked:
+            flash(message, 'danger')
+            return render_template('login.html')
+        
         user = User.get_by_username(username)
         
         if user and user.verify_password(password):
+            Security.record_login_attempt(username, True)
             login_user(user)
             return redirect(url_for('dashboard'))
         else:
+            Security.record_login_attempt(username, False)
             flash('Invalid username or password', 'danger')
     
     return render_template('login.html')
 
 @app.route('/logout')
 @login_required
+@security_headers()
 def logout():
     logout_user()
     return redirect(url_for('index'))
 
 @app.route('/dashboard')
 @login_required
+@security_headers()
 def dashboard():
     return render_template('dashboard.html')
 
-
+# API Routes
 @app.route('/api/books', methods=['POST'])
 @login_required
-def add_book():
-    # Check permission
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['isbn', 'title', 'author', 'category'],
+    'properties': {
+        'isbn': {'type': 'string'},
+        'title': {'type': 'string'},
+        'author': {'type': 'string'},
+        'category': {'type': 'string'},
+        'publicationYear': {'type': 'integer'},
+        'copies': {'type': 'integer', 'minimum': 1}
+    }
+})
+def api_add_book():
     if not current_user.has_permission('manage_books'):
-        return jsonify({'error': 'Permission denied'}), 403
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
-    # Code to add a book
-    pass
+    data = request.get_json()
+    
+    try:
+        book_id = Book.create(
+            data['isbn'],
+            data['title'],
+            data['author'],
+            data['category'],
+            data.get('publicationYear'),
+            int(data.get('copies', 1))
+        )
+        return jsonify({'success': True, 'book_id': book_id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
-# Implement other routes for users, permissions, borrowing
 @app.route('/api/books', methods=['GET'])
 def api_get_books():
     query = request.args.get('q', '')
@@ -126,51 +184,11 @@ def api_get_book(book_id):
     
     return jsonify(book_data)
 
-@app.route('/api/books', methods=['POST'])
-@login_required
-def api_add_book():
-    if not current_user.has_permission('manage_books'):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
-    data = request.get_json()
-    
-    try:
-        book_id = Book.create(
-            data['isbn'],
-            data['title'],
-            data['author'],
-            data['category'],
-            data.get('publicationYear'),
-            int(data.get('copies', 1))
-        )
-        return jsonify({'success': True, 'book_id': book_id})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
-
-@app.route('/api/books/<int:book_id>', methods=['PUT'])
-@login_required
-def api_update_book(book_id):
-    if not current_user.has_permission('manage_books'):
-        return jsonify({'success': False, 'message': 'Permission denied'}), 403
-    
-    data = request.get_json()
-    
-    try:
-        Book.update(
-            book_id,
-            data['title'],
-            data['author'],
-            data['category'],
-            data.get('publicationYear'),
-            int(data.get('copies_available', 1)),
-            int(data.get('total_copies', 1))
-        )
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
-
 @app.route('/api/books/<int:book_id>', methods=['DELETE'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
 def api_delete_book(book_id):
     if not current_user.has_permission('manage_books'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
@@ -180,23 +198,45 @@ def api_delete_book(book_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
-    
+
 @app.route('/api/users', methods=['GET'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
 def api_get_users():
     if not current_user.has_permission('manage_users'):
         return jsonify({'error': 'Permission denied'}), 403
     
-    # Code to fetch users
-    # Similar to get_books implementation
-    
+    users = User.get_all()
+    return jsonify(users)
+
 @app.route('/api/users', methods=['POST'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['username', 'password', 'full_name', 'email', 'role'],
+    'properties': {
+        'username': {'type': 'string'},
+        'password': {'type': 'string'},
+        'full_name': {'type': 'string'},
+        'email': {'type': 'string', 'format': 'email'},
+        'role': {'type': 'string', 'enum': ['admin', 'librarian', 'member']}
+    }
+})
 def api_add_user():
     if not current_user.has_permission('manage_users'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
     data = request.get_json()
+    
+    # Validate password
+    is_valid, message = Security.validate_password(data['password'])
+    if not is_valid:
+        return jsonify({'success': False, 'message': message}), 400
     
     try:
         user_id = User.create(
@@ -209,15 +249,26 @@ def api_add_user():
         return jsonify({'success': True, 'user_id': user_id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
-    
+
 @app.route('/api/borrowings/borrow', methods=['POST'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['book_id'],
+    'properties': {
+        'book_id': {'type': 'integer'},
+        'days': {'type': 'integer', 'minimum': 1, 'maximum': 30}
+    }
+})
 def api_borrow_book():
     if not current_user.has_permission('borrow_books'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
     data = request.get_json()
-    book_id = data.get('book_id')
+    book_id = data['book_id']
     days = data.get('days', 14)
     
     success, message = Borrowing.borrow_book(current_user.id, book_id, days)
@@ -229,12 +280,22 @@ def api_borrow_book():
 
 @app.route('/api/borrowings/return', methods=['POST'])
 @login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['borrowing_id'],
+    'properties': {
+        'borrowing_id': {'type': 'integer'}
+    }
+})
 def api_return_book():
     if not current_user.has_permission('return_books'):
         return jsonify({'success': False, 'message': 'Permission denied'}), 403
     
     data = request.get_json()
-    borrowing_id = data.get('borrowing_id')
+    borrowing_id = data['borrowing_id']
     
     success, message = Borrowing.return_book(borrowing_id)
     
@@ -325,8 +386,6 @@ def api_revoke_permission():
         'message': message
     })
 
-
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=Config.DEBUG)
 
