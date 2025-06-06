@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="h2 mb-4">Audit Logs</h1>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form id="filterForm" class="row g-3">
+                <div class="col-md-3">
+                    <label for="action" class="form-label">Action</label>
+                    <select class="form-select" id="action" name="action">
+                        <option value="">All Actions</option>
+                        <option value="user_login">User Login</option>
+                        <option value="user_logout">User Logout</option>
+                        <option value="user_create">User Create</option>
+                        <option value="user_update">User Update</option>
+                        <option value="user_delete">User Delete</option>
+                        <option value="book_create">Book Create</option>
+                        <option value="book_update">Book Update</option>
+                        <option value="book_delete">Book Delete</option>
+                        <option value="book_borrow">Book Borrow</option>
+                        <option value="book_return">Book Return</option>
+                        <option value="book_reserve">Book Reserve</option>
+                        <option value="fine_create">Fine Create</option>
+                        <option value="fine_pay">Fine Pay</option>
+                        <option value="fine_waive">Fine Waive</option>
+                        <option value="tag_create">Tag Create</option>
+                        <option value="tag_update">Tag Update</option>
+                        <option value="tag_delete">Tag Delete</option>
+                        <option value="tag_add">Tag Add</option>
+                        <option value="tag_remove">Tag Remove</option>
+                        <option value="system_config_update">System Config Update</option>
+                        <option value="system_backup">System Backup</option>
+                        <option value="system_restore">System Restore</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="resourceType" class="form-label">Resource Type</label>
+                    <select class="form-select" id="resourceType" name="resource_type">
+                        <option value="">All Types</option>
+                        <option value="user">User</option>
+                        <option value="book">Book</option>
+                        <option value="borrowing">Borrowing</option>
+                        <option value="fine">Fine</option>
+                        <option value="tag">Tag</option>
+                        <option value="system">System</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="startDate" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="startDate" name="start_date">
+                </div>
+                <div class="col-md-3">
+                    <label for="endDate" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="endDate" name="end_date">
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetFilters()">Reset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Audit Logs Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>User</th>
+                            <th>Action</th>
+                            <th>Resource</th>
+                            <th>Details</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                {% if log.user %}
+                                <a href="{{ url_for('user_detail', user_id=log.user_id) }}">
+                                    {{ log.user.username }}
+                                </a>
+                                {% else %}
+                                System
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ log.action }}</span>
+                            </td>
+                            <td>
+                                {% if log.resource_id %}
+                                <a href="{{ url_for(log.resource_type + '_detail', id=log.resource_id) }}">
+                                    {{ log.resource_type|title }} #{{ log.resource_id }}
+                                </a>
+                                {% else %}
+                                {{ log.resource_type|title }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.details %}
+                                <button type="button" class="btn btn-sm btn-outline-info" 
+                                        onclick="showDetails({{ log.log_id }})">
+                                    View Details
+                                </button>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.ip_address }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center">No audit logs found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Audit Log Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="detailsContent" class="bg-light p-3 rounded"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showDetails(logId) {
+    fetch(`/api/audit-logs/${logId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('detailsContent').textContent = 
+                JSON.stringify(data.details, null, 2);
+            new bootstrap.Modal(document.getElementById('detailsModal')).show();
+        })
+        .catch(error => {
+            alert('Failed to load details');
+        });
+}
+
+function resetFilters() {
+    document.getElementById('filterForm').reset();
+    document.getElementById('filterForm').submit();
+}
+
+// Set initial filter values from URL parameters
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    document.getElementById('action').value = params.get('action') || '';
+    document.getElementById('resourceType').value = params.get('resource_type') || '';
+    document.getElementById('startDate').value = params.get('start_date') || '';
+    document.getElementById('endDate').value = params.get('end_date') || '';
+});
+</script>
+{% endblock %} 

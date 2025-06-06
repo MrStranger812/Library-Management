@@ -8,6 +8,8 @@ from extensions import bcrypt, login_manager
 from utils.security import Security
 from utils.middleware import security_headers, validate_request, require_https, validate_json_schema, log_request, handle_cors
 from datetime import datetime, timedelta
+from flask_expects_json import expects_json
+from flask_expects_json.exceptions import ValidationError
 
 app = Flask(__name__)
 
@@ -40,6 +42,13 @@ from models.user_permission import UserPermission
 from models.author import Author
 from models.book_author import BookAuthor
 from models.book_review import BookReview
+from models.library_event import LibraryEvent
+from models.event_registration import EventRegistration
+from models.user_preference import UserPreference
+from models.tag import Tag
+from models.book_tag import BookTag
+from models.fine import Fine
+from models.audit_log import AuditLog
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -908,6 +917,890 @@ def api_delete_book_review(book_id, review_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 400
+
+# Library Event Routes
+@app.route('/events')
+def events():
+    query = request.args.get('q', '')
+    event_type = request.args.get('type', '')
+    
+    events_query = LibraryEvent.query
+    
+    if query:
+        events_query = events_query.filter(
+            (LibraryEvent.title.ilike(f'%{query}%')) |
+            (LibraryEvent.description.ilike(f'%{query}%'))
+        )
+    
+    if event_type:
+        events_query = events_query.filter_by(event_type=event_type)
+    
+    events = events_query.order_by(LibraryEvent.start_time).all()
+    return render_template('events/list.html', events=events)
+
+@app.route('/events/<int:event_id>')
+def event_detail(event_id):
+    event = LibraryEvent.query.get_or_404(event_id)
+    return render_template('events/detail.html', event=event)
+
+@app.route('/api/events', methods=['GET'])
+def api_get_events():
+    query = request.args.get('q', '')
+    event_type = request.args.get('type', '')
+    
+    events_query = LibraryEvent.query
+    
+    if query:
+        events_query = events_query.filter(
+            (LibraryEvent.title.ilike(f'%{query}%')) |
+            (LibraryEvent.description.ilike(f'%{query}%'))
+        )
+    
+    if event_type:
+        events_query = events_query.filter_by(event_type=event_type)
+    
+    events = events_query.order_by(LibraryEvent.start_time).all()
+    return jsonify([event.to_dict() for event in events])
+
+@app.route('/api/events', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['title', 'event_type', 'start_time', 'end_time'],
+    'properties': {
+        'title': {'type': 'string'},
+        'description': {'type': 'string'},
+        'event_type': {'type': 'string'},
+        'start_time': {'type': 'string', 'format': 'date-time'},
+        'end_time': {'type': 'string', 'format': 'date-time'},
+        'location': {'type': 'string'},
+        'capacity': {'type': 'integer', 'minimum': 1},
+        'registration_deadline': {'type': 'string', 'format': 'date-time'}
+    }
+})
+def api_add_event():
+    if not current_user.has_permission('manage_events'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    try:
+        event = LibraryEvent(
+            title=data['title'],
+            event_type=data['event_type'],
+            start_time=datetime.fromisoformat(data['start_time']),
+            end_time=datetime.fromisoformat(data['end_time']),
+            description=data.get('description'),
+            location=data.get('location'),
+            capacity=data.get('capacity'),
+            registration_deadline=datetime.fromisoformat(data['registration_deadline']) if data.get('registration_deadline') else None,
+            created_by=current_user.user_id
+        )
+        db.session.add(event)
+        db.session.commit()
+        return jsonify({'success': True, 'event': event.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/events/<int:event_id>', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'properties': {
+        'title': {'type': 'string'},
+        'description': {'type': 'string'},
+        'event_type': {'type': 'string'},
+        'start_time': {'type': 'string', 'format': 'date-time'},
+        'end_time': {'type': 'string', 'format': 'date-time'},
+        'location': {'type': 'string'},
+        'capacity': {'type': 'integer', 'minimum': 1},
+        'registration_deadline': {'type': 'string', 'format': 'date-time'}
+    }
+})
+def api_update_event(event_id):
+    if not current_user.has_permission('manage_events'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    event = LibraryEvent.query.get_or_404(event_id)
+    data = request.get_json()
+    
+    try:
+        if 'title' in data:
+            event.title = data['title']
+        if 'description' in data:
+            event.description = data['description']
+        if 'event_type' in data:
+            event.event_type = data['event_type']
+        if 'start_time' in data:
+            event.start_time = datetime.fromisoformat(data['start_time'])
+        if 'end_time' in data:
+            event.end_time = datetime.fromisoformat(data['end_time'])
+        if 'location' in data:
+            event.location = data['location']
+        if 'capacity' in data:
+            event.capacity = data['capacity']
+        if 'registration_deadline' in data:
+            event.registration_deadline = datetime.fromisoformat(data['registration_deadline']) if data['registration_deadline'] else None
+        
+        db.session.commit()
+        return jsonify({'success': True, 'event': event.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/events/<int:event_id>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_delete_event(event_id):
+    if not current_user.has_permission('manage_events'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    event = LibraryEvent.query.get_or_404(event_id)
+    
+    try:
+        db.session.delete(event)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/events/<int:event_id>/register', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_register_for_event(event_id):
+    event = LibraryEvent.query.get_or_404(event_id)
+    
+    if not event.is_registration_open:
+        return jsonify({
+            'success': False,
+            'message': 'Registration is closed for this event'
+        }), 400
+    
+    if event.is_full:
+        return jsonify({
+            'success': False,
+            'message': 'Event is full'
+        }), 400
+    
+    # Check if user is already registered
+    existing_registration = EventRegistration.query.filter_by(
+        event_id=event_id,
+        user_id=current_user.user_id
+    ).first()
+    
+    if existing_registration:
+        return jsonify({
+            'success': False,
+            'message': 'You are already registered for this event'
+        }), 400
+    
+    try:
+        registration = EventRegistration(
+            event_id=event_id,
+            user_id=current_user.user_id
+        )
+        db.session.add(registration)
+        db.session.commit()
+        return jsonify({'success': True, 'registration': registration.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/events/<int:event_id>/registrations/<int:registration_id>', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['status'],
+    'properties': {
+        'status': {'type': 'string', 'enum': ['registered', 'cancelled', 'attended', 'no_show']},
+        'notes': {'type': 'string'}
+    }
+})
+def api_update_registration(event_id, registration_id):
+    registration = EventRegistration.query.filter_by(
+        event_id=event_id,
+        registration_id=registration_id
+    ).first_or_404()
+    
+    # Only allow users to update their own registrations or admins to update any
+    if registration.user_id != current_user.user_id and not current_user.has_permission('manage_events'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    data = request.get_json()
+    try:
+        registration.status = data['status']
+        if 'notes' in data:
+            registration.notes = data['notes']
+        db.session.commit()
+        return jsonify({'success': True, 'registration': registration.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/events/<int:event_id>/registrations/<int:registration_id>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_cancel_registration(event_id, registration_id):
+    registration = EventRegistration.query.filter_by(
+        event_id=event_id,
+        registration_id=registration_id
+    ).first_or_404()
+    
+    # Only allow users to cancel their own registrations or admins to cancel any
+    if registration.user_id != current_user.user_id and not current_user.has_permission('manage_events'):
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+    
+    try:
+        db.session.delete(registration)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# User Preferences Routes
+@app.route('/preferences')
+@login_required
+def preferences():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+        db.session.commit()
+    return render_template('preferences/index.html', preferences=user_prefs)
+
+@app.route('/api/preferences', methods=['GET'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_get_preferences():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+        db.session.commit()
+    return jsonify(user_prefs.to_dict())
+
+@app.route('/api/preferences', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'properties': {
+        'email_notifications': {'type': 'boolean'},
+        'sms_notifications': {'type': 'boolean'},
+        'notification_types': {
+            'type': 'object',
+            'properties': {
+                'due_date': {'type': 'boolean'},
+                'overdue': {'type': 'boolean'},
+                'reservation': {'type': 'boolean'},
+                'system': {'type': 'boolean'}
+            }
+        },
+        'theme': {'type': 'string', 'enum': ['light', 'dark', 'system']},
+        'language': {'type': 'string'},
+        'items_per_page': {'type': 'integer', 'minimum': 5, 'maximum': 100},
+        'show_cover_images': {'type': 'boolean'},
+        'default_search_type': {'type': 'string'},
+        'show_reading_history': {'type': 'boolean'},
+        'show_reviews': {'type': 'boolean'},
+        'allow_recommendations': {'type': 'boolean'}
+    }
+})
+def api_update_preferences():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+    
+    data = request.get_json()
+    try:
+        user_prefs.update_preferences(**data)
+        db.session.commit()
+        return jsonify({'success': True, 'preferences': user_prefs.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/search-history', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['query'],
+    'properties': {
+        'query': {'type': 'string'}
+    }
+})
+def api_add_search_history():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+    
+    data = request.get_json()
+    try:
+        user_prefs.add_search_to_history(data['query'])
+        db.session.commit()
+        return jsonify({'success': True, 'search_history': user_prefs.search_history})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/saved-searches', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['name', 'params'],
+    'properties': {
+        'name': {'type': 'string'},
+        'params': {'type': 'object'}
+    }
+})
+def api_save_search():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+    
+    data = request.get_json()
+    try:
+        user_prefs.save_search(data['name'], data['params'])
+        db.session.commit()
+        return jsonify({'success': True, 'saved_searches': user_prefs.saved_searches})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/saved-searches/<string:search_name>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_remove_saved_search(search_name):
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        return jsonify({'success': False, 'message': 'No preferences found'}), 404
+    
+    try:
+        user_prefs.remove_saved_search(search_name)
+        db.session.commit()
+        return jsonify({'success': True, 'saved_searches': user_prefs.saved_searches})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/reading-goals', methods=['PUT'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'properties': {
+        'books_per_year': {'type': 'integer', 'minimum': 0},
+        'pages_per_day': {'type': 'integer', 'minimum': 0}
+    }
+})
+def api_update_reading_goals():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+    
+    data = request.get_json()
+    try:
+        user_prefs.update_reading_goals(
+            books_per_year=data.get('books_per_year'),
+            pages_per_day=data.get('pages_per_day')
+        )
+        db.session.commit()
+        return jsonify({'success': True, 'reading_goals': user_prefs.reading_goals})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/preferred-categories', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['category'],
+    'properties': {
+        'category': {'type': 'string'}
+    }
+})
+def api_add_preferred_category():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+    
+    data = request.get_json()
+    try:
+        user_prefs.add_preferred_category(data['category'])
+        db.session.commit()
+        return jsonify({'success': True, 'preferred_categories': user_prefs.preferred_categories})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/preferred-categories/<string:category>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_remove_preferred_category(category):
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        return jsonify({'success': False, 'message': 'No preferences found'}), 404
+    
+    try:
+        user_prefs.remove_preferred_category(category)
+        db.session.commit()
+        return jsonify({'success': True, 'preferred_categories': user_prefs.preferred_categories})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/preferred-authors', methods=['POST'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+@validate_json_schema({
+    'type': 'object',
+    'required': ['author_id'],
+    'properties': {
+        'author_id': {'type': 'integer'}
+    }
+})
+def api_add_preferred_author():
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        user_prefs = UserPreference.create_default(current_user.user_id)
+        db.session.add(user_prefs)
+    
+    data = request.get_json()
+    try:
+        user_prefs.add_preferred_author(data['author_id'])
+        db.session.commit()
+        return jsonify({'success': True, 'preferred_authors': user_prefs.preferred_authors})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/preferences/preferred-authors/<int:author_id>', methods=['DELETE'])
+@login_required
+@Security.require_api_key()
+@validate_request()
+@security_headers()
+def api_remove_preferred_author(author_id):
+    user_prefs = UserPreference.get_by_user_id(current_user.user_id)
+    if not user_prefs:
+        return jsonify({'success': False, 'message': 'No preferences found'}), 404
+    
+    try:
+        user_prefs.remove_preferred_author(author_id)
+        db.session.commit()
+        return jsonify({'success': True, 'preferred_authors': user_prefs.preferred_authors})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# Tag Management Routes
+@app.route('/tags')
+@login_required
+def tag_list():
+    """List all tags."""
+    tags = Tag.query.order_by(Tag.name).all()
+    return render_template('tags/list.html', tags=tags)
+
+@app.route('/tags/<int:tag_id>')
+@login_required
+def tag_detail(tag_id):
+    """View tag details and associated books."""
+    tag = Tag.query.get_or_404(tag_id)
+    books = tag.books.order_by(Book.title).all()
+    return render_template('tags/detail.html', tag=tag, books=books)
+
+# Tag API Routes
+@app.route('/api/tags', methods=['GET'])
+@login_required
+def get_tags():
+    """Get all tags."""
+    tags = Tag.query.order_by(Tag.name).all()
+    return jsonify([tag.to_dict() for tag in tags])
+
+@app.route('/api/tags', methods=['POST'])
+@login_required
+@permission_required('manage_tags')
+def create_tag():
+    """Create a new tag."""
+    data = request.get_json()
+    
+    # Validate input
+    schema = {
+        'type': 'object',
+        'required': ['name'],
+        'properties': {
+            'name': {'type': 'string', 'minLength': 1, 'maxLength': 50},
+            'description': {'type': 'string'},
+            'color': {'type': 'string', 'pattern': '^#[0-9a-fA-F]{6}$'}
+        }
+    }
+    
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    
+    # Check if tag already exists
+    existing_tag = Tag.get_by_name(data['name'])
+    if existing_tag:
+        return jsonify({'error': 'Tag already exists'}), 409
+    
+    # Create new tag
+    tag = Tag(
+        name=data['name'],
+        description=data.get('description'),
+        color=data.get('color', '#6c757d'),
+        created_by=current_user.user_id
+    )
+    
+    try:
+        db.session.add(tag)
+        db.session.commit()
+        return jsonify(tag.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tags/<int:tag_id>', methods=['PUT'])
+@login_required
+@permission_required('manage_tags')
+def update_tag(tag_id):
+    """Update a tag."""
+    tag = Tag.query.get_or_404(tag_id)
+    data = request.get_json()
+    
+    # Validate input
+    schema = {
+        'type': 'object',
+        'properties': {
+            'name': {'type': 'string', 'minLength': 1, 'maxLength': 50},
+            'description': {'type': 'string'},
+            'color': {'type': 'string', 'pattern': '^#[0-9a-fA-F]{6}$'}
+        }
+    }
+    
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    
+    # Check if new name conflicts with existing tag
+    if 'name' in data and data['name'] != tag.name:
+        existing_tag = Tag.get_by_name(data['name'])
+        if existing_tag:
+            return jsonify({'error': 'Tag name already exists'}), 409
+    
+    try:
+        tag.update(**data)
+        db.session.commit()
+        return jsonify(tag.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tags/<int:tag_id>', methods=['DELETE'])
+@login_required
+@permission_required('manage_tags')
+def delete_tag(tag_id):
+    """Delete a tag."""
+    tag = Tag.query.get_or_404(tag_id)
+    
+    try:
+        tag.delete()
+        return '', 204
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Book Tag API Routes
+@app.route('/api/books/<int:book_id>/tags', methods=['GET'])
+@login_required
+def get_book_tags(book_id):
+    """Get all tags for a book."""
+    book = Book.query.get_or_404(book_id)
+    return jsonify([tag.to_dict() for tag in book.tags])
+
+@app.route('/api/books/<int:book_id>/tags', methods=['POST'])
+@login_required
+@permission_required('manage_tags')
+def add_book_tag(book_id):
+    """Add a tag to a book."""
+    book = Book.query.get_or_404(book_id)
+    data = request.get_json()
+    
+    # Validate input
+    schema = {
+        'type': 'object',
+        'required': ['tag_id'],
+        'properties': {
+            'tag_id': {'type': 'integer'}
+        }
+    }
+    
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    
+    tag = Tag.query.get_or_404(data['tag_id'])
+    
+    try:
+        book_tag = BookTag.add_tag_to_book(book_id, tag.tag_id, current_user.user_id)
+        return jsonify(book_tag.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/books/<int:book_id>/tags/<int:tag_id>', methods=['DELETE'])
+@login_required
+@permission_required('manage_tags')
+def remove_book_tag(book_id, tag_id):
+    """Remove a tag from a book."""
+    book = Book.query.get_or_404(book_id)
+    tag = Tag.query.get_or_404(tag_id)
+    
+    try:
+        if BookTag.remove_tag_from_book(book_id, tag_id):
+            return '', 204
+        return jsonify({'error': 'Tag not associated with book'}), 404
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Fine Management Routes
+@app.route('/fines')
+@login_required
+def fine_list():
+    """List all fines."""
+    fines = Fine.query.order_by(Fine.created_at.desc()).all()
+    return render_template('fines/list.html', fines=fines)
+
+@app.route('/fines/<int:fine_id>')
+@login_required
+def fine_detail(fine_id):
+    """View fine details."""
+    fine = Fine.query.get_or_404(fine_id)
+    return render_template('fines/detail.html', fine=fine)
+
+# Fine API Routes
+@app.route('/api/fines', methods=['GET'])
+@login_required
+def get_fines():
+    """Get all fines."""
+    fines = Fine.query.order_by(Fine.created_at.desc()).all()
+    return jsonify([fine.to_dict() for fine in fines])
+
+@app.route('/api/fines/<int:fine_id>', methods=['GET'])
+@login_required
+def get_fine(fine_id):
+    """Get fine details."""
+    fine = Fine.query.get_or_404(fine_id)
+    return jsonify(fine.to_dict())
+
+@app.route('/api/fines/<int:fine_id>/pay', methods=['POST'])
+@login_required
+def pay_fine(fine_id):
+    """Pay a fine."""
+    fine = Fine.query.get_or_404(fine_id)
+    
+    if fine.is_paid:
+        return jsonify({'error': 'Fine is already paid'}), 400
+    
+    data = request.get_json()
+    schema = {
+        'type': 'object',
+        'properties': {
+            'payment_method': {'type': 'string', 'enum': ['cash', 'credit_card', 'debit_card', 'bank_transfer']},
+            'payment_reference': {'type': 'string'},
+            'notes': {'type': 'string'}
+        },
+        'required': ['payment_method']
+    }
+    
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    
+    try:
+        fine.pay(
+            payment_method=data['payment_method'],
+            payment_reference=data.get('payment_reference'),
+            notes=data.get('notes')
+        )
+        db.session.commit()
+        return jsonify(fine.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/fines/<int:fine_id>/waive', methods=['POST'])
+@login_required
+def waive_fine(fine_id):
+    """Waive a fine."""
+    fine = Fine.query.get_or_404(fine_id)
+    
+    if fine.is_paid:
+        return jsonify({'error': 'Fine is already paid'}), 400
+    
+    data = request.get_json()
+    schema = {
+        'type': 'object',
+        'properties': {
+            'notes': {'type': 'string'}
+        },
+        'required': ['notes']
+    }
+    
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    
+    try:
+        fine.waive(notes=data['notes'])
+        db.session.commit()
+        return jsonify(fine.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/borrowings/<int:borrowing_id>/fines', methods=['GET'])
+@login_required
+@permission_required('manage_fines')
+def get_borrowing_fines(borrowing_id):
+    """Get all fines for a borrowing."""
+    borrowing = Borrowing.query.get_or_404(borrowing_id)
+    return jsonify([fine.to_dict() for fine in borrowing.fines])
+
+@app.route('/api/borrowings/<int:borrowing_id>/fines', methods=['POST'])
+@login_required
+@permission_required('manage_fines')
+def create_borrowing_fine(borrowing_id):
+    """Create a fine for a borrowing."""
+    borrowing = Borrowing.query.get_or_404(borrowing_id)
+    data = request.get_json()
+    
+    # Validate input
+    schema = {
+        'type': 'object',
+        'properties': {
+            'notes': {'type': 'string'}
+        }
+    }
+    
+    try:
+        validate(instance=data, schema=schema)
+    except ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    
+    try:
+        fine = Fine.create_for_borrowing(borrowing, notes=data.get('notes'))
+        if fine:
+            return jsonify(fine.to_dict()), 201
+        return jsonify({'error': 'No fine amount calculated'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Audit Log Routes
+@app.route('/audit-logs')
+@login_required
+@permission_required('view_audit_logs')
+def audit_log_list():
+    """List audit logs with filtering."""
+    action = request.args.get('action')
+    resource_type = request.args.get('resource_type')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    query = AuditLog.query
+    
+    if action:
+        query = query.filter_by(action=action)
+    if resource_type:
+        query = query.filter_by(resource_type=resource_type)
+    if start_date:
+        query = query.filter(AuditLog.created_at >= datetime.strptime(start_date, '%Y-%m-%d'))
+    if end_date:
+        query = query.filter(AuditLog.created_at <= datetime.strptime(end_date, '%Y-%m-%d'))
+    
+    logs = query.order_by(AuditLog.created_at.desc()).limit(100).all()
+    return render_template('audit/list.html', logs=logs)
+
+@app.route('/api/audit-logs/<int:log_id>')
+@login_required
+@permission_required('view_audit_logs')
+def get_audit_log(log_id):
+    """Get audit log details."""
+    log = AuditLog.query.get_or_404(log_id)
+    return jsonify(log.to_dict())
+
+@app.route('/api/audit-logs')
+@login_required
+@permission_required('view_audit_logs')
+def get_audit_logs():
+    """Get filtered audit logs."""
+    action = request.args.get('action')
+    resource_type = request.args.get('resource_type')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    query = AuditLog.query
+    
+    if action:
+        query = query.filter_by(action=action)
+    if resource_type:
+        query = query.filter_by(resource_type=resource_type)
+    if start_date:
+        query = query.filter(AuditLog.created_at >= datetime.strptime(start_date, '%Y-%m-%d'))
+    if end_date:
+        query = query.filter(AuditLog.created_at <= datetime.strptime(end_date, '%Y-%m-%d'))
+    
+    logs = query.order_by(AuditLog.created_at.desc()).limit(100).all()
+    return jsonify([log.to_dict() for log in logs])
 
 if __name__ == '__main__':
     app.run(debug=Config.DEBUG)

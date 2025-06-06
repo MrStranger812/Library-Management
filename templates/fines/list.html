@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Fines{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="h2 mb-4">Fines</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Borrowing</th>
+                            <th>Amount</th>
+                            <th>Reason</th>
+                            <th>Created</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fine in fines %}
+                        <tr>
+                            <td>{{ fine.fine_id }}</td>
+                            <td>
+                                <a href="{{ url_for('borrowing_detail', borrowing_id=fine.borrowing_id) }}">
+                                    Borrowing #{{ fine.borrowing_id }}
+                                </a>
+                            </td>
+                            <td>${{ "%.2f"|format(fine.amount) }}</td>
+                            <td>{{ fine.reason }}</td>
+                            <td>{{ fine.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% if fine.is_paid %}
+                                <span class="badge bg-success">Paid</span>
+                                {% else %}
+                                <span class="badge bg-danger">Unpaid</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{{ url_for('fine_detail', fine_id=fine.fine_id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if not fine.is_paid %}
+                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                            onclick="payFine({{ fine.fine_id }})">
+                                        <i class="bi bi-cash"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" 
+                                            onclick="waiveFine({{ fine.fine_id }})">
+                                        <i class="bi bi-x-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center">No fines found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pay Fine Modal -->
+<div class="modal fade" id="payFineModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Pay Fine</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="payFineForm">
+                    <input type="hidden" id="fineId">
+                    <div class="mb-3">
+                        <label for="paymentMethod" class="form-label">Payment Method</label>
+                        <select class="form-select" id="paymentMethod" required>
+                            <option value="cash">Cash</option>
+                            <option value="credit_card">Credit Card</option>
+                            <option value="debit_card">Debit Card</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="paymentReference" class="form-label">Payment Reference</label>
+                        <input type="text" class="form-control" id="paymentReference">
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="submitPayment()">Pay Fine</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Waive Fine Modal -->
+<div class="modal fade" id="waiveFineModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Waive Fine</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="waiveFineForm">
+                    <input type="hidden" id="waiveFineId">
+                    <div class="mb-3">
+                        <label for="waiveNotes" class="form-label">Reason for Waiving</label>
+                        <textarea class="form-control" id="waiveNotes" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="submitWaiver()">Waive Fine</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function payFine(fineId) {
+    document.getElementById('fineId').value = fineId;
+    new bootstrap.Modal(document.getElementById('payFineModal')).show();
+}
+
+function submitPayment() {
+    const fineId = document.getElementById('fineId').value;
+    const data = {
+        payment_method: document.getElementById('paymentMethod').value,
+        payment_reference: document.getElementById('paymentReference').value,
+        notes: document.getElementById('notes').value
+    };
+    
+    fetch(`/api/fines/${fineId}/pay`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Failed to pay fine');
+        window.location.reload();
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+}
+
+function waiveFine(fineId) {
+    document.getElementById('waiveFineId').value = fineId;
+    new bootstrap.Modal(document.getElementById('waiveFineModal')).show();
+}
+
+function submitWaiver() {
+    const fineId = document.getElementById('waiveFineId').value;
+    const data = {
+        notes: document.getElementById('waiveNotes').value
+    };
+    
+    fetch(`/api/fines/${fineId}/waive`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Failed to waive fine');
+        window.location.reload();
+    })
+    .catch(error => {
+        alert(error.message);
+    });
+}
+</script>
+{% endblock %} 

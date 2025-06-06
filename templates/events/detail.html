@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('events') }}">Events</a></li>
+            <li class="breadcrumb-item active">{{ event.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Event Details -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h1 class="h2 mb-2">{{ event.title }}</h1>
+                            <span class="badge bg-primary">{{ event.event_type|title }}</span>
+                        </div>
+                        {% if current_user.has_permission('manage_events') %}
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-primary" onclick="editEvent()">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" onclick="deleteEvent()">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <h5 class="card-title">Description</h5>
+                        <p class="card-text">{{ event.description or 'No description provided.' }}</p>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Date & Time</h5>
+                            <p class="card-text">
+                                <i class="fas fa-calendar"></i> {{ event.start_time.strftime('%B %d, %Y') }}<br>
+                                <i class="fas fa-clock"></i> {{ event.start_time.strftime('%I:%M %p') }} - {{ event.end_time.strftime('%I:%M %p') }}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="card-title">Location</h5>
+                            <p class="card-text">
+                                <i class="fas fa-map-marker-alt"></i> {{ event.location or 'Location not specified' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5 class="card-title">Capacity</h5>
+                            <p class="card-text">
+                                <i class="fas fa-users"></i> {{ event.registrations|length }}/{{ event.capacity or 'Unlimited' }}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5 class="card-title">Registration Deadline</h5>
+                            <p class="card-text">
+                                <i class="fas fa-hourglass-end"></i> 
+                                {% if event.registration_deadline %}
+                                    {{ event.registration_deadline.strftime('%B %d, %Y %I:%M %p') }}
+                                {% else %}
+                                    No deadline set
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if not current_user.has_permission('manage_events') %}
+                    <div class="d-grid gap-2">
+                        {% if event.is_registration_open and not event.is_full %}
+                            {% if current_user.is_registered_for_event(event.event_id) %}
+                            <button class="btn btn-danger" onclick="cancelRegistration({{ event.event_id }}, {{ current_user.get_registration_id(event.event_id) }})">
+                                Cancel Registration
+                            </button>
+                            {% else %}
+                            <button class="btn btn-success" onclick="registerForEvent({{ event.event_id }})">
+                                Register for Event
+                            </button>
+                            {% endif %}
+                        {% elif event.is_full %}
+                            <button class="btn btn-secondary" disabled>Event is Full</button>
+                        {% else %}
+                            <button class="btn btn-secondary" disabled>Registration Closed</button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Registration Status -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Registration Status</h5>
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar" 
+                             style="width: {{ (event.registrations|length / event.capacity * 100)|round|int }}%"
+                             aria-valuenow="{{ event.registrations|length }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="{{ event.capacity }}">
+                            {{ event.registrations|length }}/{{ event.capacity }}
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        {% if event.is_registration_open %}
+                            {% if event.is_full %}
+                                <span class="text-danger">Event is full</span>
+                            {% else %}
+                                <span class="text-success">Registration is open</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-secondary">Registration is closed</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Registrations List (Admin Only) -->
+            {% if current_user.has_permission('manage_events') %}
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Registrations</h5>
+                    <div class="list-group list-group-flush">
+                        {% for registration in event.registrations %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ registration.user.full_name }}</h6>
+                                    <small class="text-muted">{{ registration.user.email }}</small>
+                                </div>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                        {{ registration.status|title }}
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="updateRegistrationStatus({{ event.event_id }}, {{ registration.registration_id }}, 'registered')">Registered</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="updateRegistrationStatus({{ event.event_id }}, {{ registration.registration_id }}, 'cancelled')">Cancelled</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="updateRegistrationStatus({{ event.event_id }}, {{ registration.registration_id }}, 'attended')">Attended</a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="updateRegistrationStatus({{ event.event_id }}, {{ registration.registration_id }}, 'no_show')">No Show</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No registrations yet.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Edit Event Modal -->
+{% if current_user.has_permission('manage_events') %}
+<div class="modal fade" id="editEventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Event</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editEventForm">
+                    <div class="mb-3">
+                        <label for="edit_title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="edit_title" name="title" value="{{ event.title }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_event_type" class="form-label">Event Type</label>
+                        <select class="form-select" id="edit_event_type" name="event_type" required>
+                            <option value="workshop" {% if event.event_type == 'workshop' %}selected{% endif %}>Workshop</option>
+                            <option value="lecture" {% if event.event_type == 'lecture' %}selected{% endif %}>Lecture</option>
+                            <option value="book_club" {% if event.event_type == 'book_club' %}selected{% endif %}>Book Club</option>
+                            <option value="exhibition" {% if event.event_type == 'exhibition' %}selected{% endif %}>Exhibition</option>
+                            <option value="other" {% if event.event_type == 'other' %}selected{% endif %}>Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">Description</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="3">{{ event.description }}</textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_start_time" class="form-label">Start Time</label>
+                            <input type="datetime-local" class="form-control" id="edit_start_time" name="start_time" 
+                                   value="{{ event.start_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_end_time" class="form-label">End Time</label>
+                            <input type="datetime-local" class="form-control" id="edit_end_time" name="end_time" 
+                                   value="{{ event.end_time.strftime('%Y-%m-%dT%H:%M') }}" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="edit_location" name="location" value="{{ event.location }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_capacity" class="form-label">Capacity</label>
+                        <input type="number" class="form-control" id="edit_capacity" name="capacity" min="1" value="{{ event.capacity }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_registration_deadline" class="form-label">Registration Deadline</label>
+                        <input type="datetime-local" class="form-control" id="edit_registration_deadline" name="registration_deadline" 
+                               value="{{ event.registration_deadline.strftime('%Y-%m-%dT%H:%M') if event.registration_deadline }}">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateEvent()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function registerForEvent(eventId) {
+    fetch(`/api/events/${eventId}/register`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': '{{ current_user.api_key }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Successfully registered for the event!');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showAlert('danger', data.message || 'Failed to register for the event.');
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'An error occurred while registering for the event.');
+        console.error('Error:', error);
+    });
+}
+
+function cancelRegistration(eventId, registrationId) {
+    if (!confirm('Are you sure you want to cancel your registration?')) {
+        return;
+    }
+    
+    fetch(`/api/events/${eventId}/registrations/${registrationId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': '{{ current_user.api_key }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Successfully cancelled your registration.');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showAlert('danger', data.message || 'Failed to cancel registration.');
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'An error occurred while cancelling your registration.');
+        console.error('Error:', error);
+    });
+}
+
+{% if current_user.has_permission('manage_events') %}
+function editEvent() {
+    const modal = new bootstrap.Modal(document.getElementById('editEventModal'));
+    modal.show();
+}
+
+function updateEvent() {
+    const form = document.getElementById('editEventForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+    
+    fetch('/api/events/{{ event.event_id }}', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': '{{ current_user.api_key }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Event updated successfully!');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showAlert('danger', data.message || 'Failed to update event.');
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'An error occurred while updating the event.');
+        console.error('Error:', error);
+    });
+}
+
+function deleteEvent() {
+    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch('/api/events/{{ event.event_id }}', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': '{{ current_user.api_key }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Event deleted successfully!');
+            setTimeout(() => window.location.href = '/events', 1500);
+        } else {
+            showAlert('danger', data.message || 'Failed to delete event.');
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'An error occurred while deleting the event.');
+        console.error('Error:', error);
+    });
+}
+
+function updateRegistrationStatus(eventId, registrationId, status) {
+    fetch(`/api/events/${eventId}/registrations/${registrationId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': '{{ current_user.api_key }}'
+        },
+        body: JSON.stringify({ status: status })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', 'Registration status updated successfully!');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showAlert('danger', data.message || 'Failed to update registration status.');
+        }
+    })
+    .catch(error => {
+        showAlert('danger', 'An error occurred while updating registration status.');
+        console.error('Error:', error);
+    });
+}
+{% endif %}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+}
+</script>
+{% endblock %} 

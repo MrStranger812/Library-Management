@@ -382,25 +382,31 @@ CREATE TABLE user_preferences (
     INDEX idx_preference_name (preference_name)
 );
 
--- Create book_tags table (from enhanced.sql)
+-- Create book_tags table
 CREATE TABLE book_tags (
     tag_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
+    name VARCHAR(50) NOT NULL UNIQUE,
     description TEXT,
+    color VARCHAR(7) DEFAULT '#6c757d',
+    created_by INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
+    FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
     INDEX idx_name (name)
 );
 
--- Create book_tag_assignments table (from enhanced.sql)
+-- Create book_tag_assignments table
 CREATE TABLE book_tag_assignments (
     book_id INT,
     tag_id INT,
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    added_by INT,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     PRIMARY KEY (book_id, tag_id),
     FOREIGN KEY (book_id) REFERENCES books(book_id) ON DELETE CASCADE,
-    FOREIGN KEY (tag_id) REFERENCES book_tags(tag_id) ON DELETE CASCADE
+    FOREIGN KEY (tag_id) REFERENCES book_tags(tag_id) ON DELETE CASCADE,
+    FOREIGN KEY (added_by) REFERENCES users(user_id) ON DELETE SET NULL
 );
 
 -- Insert default data

@@ -31,7 +31,7 @@ class Book(db.Model):
     borrowings = db.relationship('Borrowing', backref='book', lazy=True)
     reviews = db.relationship('BookReview', backref='book', lazy=True)
     copies = db.relationship('BookCopy', backref='book', lazy=True)
-    tags = db.relationship('BookTag', secondary='book_tag_assignments', backref='books')
+    tags = db.relationship('Tag', secondary='book_tag_assignments', backref='books')
 
     def __init__(self, isbn, title, author, category_id=None, publisher_id=None, 
                  publication_year=None, description=None, total_copies=1):
