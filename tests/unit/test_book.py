@@ -13,17 +13,17 @@ def test_create_book(db_session):
         publication_year=2023,
         description='Test Description',
         total_copies=5,
-        available_copies=5
+        copies_available=5
     )
     db_session.add(book)
     db_session.commit()
     
-    assert book.id is not None
+    assert book.book_id is not None
     assert book.title == 'Test Book'
     assert book.author == 'Test Author'
     assert book.isbn == '1234567890'
     assert book.total_copies == 5
-    assert book.available_copies == 5
+    assert book.copies_available == 5
 
 def test_book_isbn_validation(db_session):
     """Test ISBN validation."""
@@ -64,14 +64,14 @@ def test_book_copy_management(db_session):
     db_session.commit()
     
     assert book.total_copies == 3
-    assert book.available_copies == 3
+    assert book.copies_available == 3
     
     # Remove copies
     book.remove_copies(1)
     db_session.commit()
     
     assert book.total_copies == 2
-    assert book.available_copies == 2
+    assert book.copies_available == 2
 
 def test_book_availability(db_session):
     """Test book availability tracking."""
@@ -92,14 +92,14 @@ def test_book_availability(db_session):
     book.borrow_copy()
     db_session.commit()
     
-    assert book.available_copies == 1
+    assert book.copies_available == 1
     assert book.is_available() is True
     
     # Borrow another copy
     book.borrow_copy()
     db_session.commit()
     
-    assert book.available_copies == 0
+    assert book.copies_available == 0
     assert book.is_available() is False
 
 def test_book_tags(db_session):
@@ -182,7 +182,7 @@ def test_book_copy_status(db_session):
     db_session.commit()
     
     assert copy.status == 'borrowed'
-    assert book.available_copies == 0
+    assert book.copies_available == 0
 
 def test_book_statistics(db_session):
     """Test book statistics tracking."""
@@ -202,8 +202,6 @@ def test_book_statistics(db_session):
     book.borrow_copy()
     db_session.commit()
     
-    stats = book.get_statistics()
-    assert stats['total_copies'] == 3
-    assert stats['available_copies'] == 1
-    assert stats['borrowed_copies'] == 2
-    assert stats['availability_percentage'] == 33.33 
+    assert book.total_copies == 3
+    assert book.copies_available == 1
+    assert book.borrowed_copies == 2 

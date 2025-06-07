@@ -1,7 +1,7 @@
 from datetime import datetime
+from extensions import db
 from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
-from database import db
 
 class AuditLog(db.Model):
     """Model for tracking system actions and changes."""

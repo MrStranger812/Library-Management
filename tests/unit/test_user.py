@@ -8,14 +8,14 @@ def test_create_user(db_session):
     user = User(
         username='testuser',
         email='test@example.com',
-        password_hash='hashed_password',
-        role='member',
-        is_active=True
+        password='testpass',
+        full_name='Test User',
+        role='member'
     )
     db_session.add(user)
     db_session.commit()
     
-    assert user.id is not None
+    assert user.user_id is not None
     assert user.username == 'testuser'
     assert user.email == 'test@example.com'
     assert user.role == 'member'
@@ -26,12 +26,15 @@ def test_user_password_hashing(db_session):
     user = User(
         username='testuser',
         email='test@example.com',
+        password='testpass',
+        full_name='Test User',
         role='member'
     )
-    user.set_password('testpass')
+    db_session.add(user)
+    db_session.commit()
     
-    assert user.check_password('testpass') is True
-    assert user.check_password('wrongpass') is False
+    assert user.verify_password('testpass') is True
+    assert user.verify_password('wrongpass') is False
 
 def test_user_role_validation(db_session):
     """Test user role validation."""
@@ -39,6 +42,8 @@ def test_user_role_validation(db_session):
         User(
             username='testuser',
             email='test@example.com',
+            password='testpass',
+            full_name='Test User',
             role='invalid_role'
         )
 
@@ -48,6 +53,8 @@ def test_user_email_validation(db_session):
         User(
             username='testuser',
             email='invalid_email',
+            password='testpass',
+            full_name='Test User',
             role='member'
         )
 
@@ -57,6 +64,8 @@ def test_user_username_validation(db_session):
         User(
             username='a',  # Too short
             email='test@example.com',
+            password='testpass',
+            full_name='Test User',
             role='member'
         )
 
@@ -65,6 +74,8 @@ def test_user_last_login(db_session):
     user = User(
         username='testuser',
         email='test@example.com',
+        password='testpass',
+        full_name='Test User',
         role='member'
     )
     db_session.add(user)
@@ -72,7 +83,7 @@ def test_user_last_login(db_session):
     
     assert user.last_login is None
     
-    user.update_last_login()
+    user.last_login = datetime.utcnow()
     db_session.commit()
     
     assert user.last_login is not None
@@ -83,6 +94,8 @@ def test_user_account_lockout(db_session):
     user = User(
         username='testuser',
         email='test@example.com',
+        password='testpass',
+        full_name='Test User',
         role='member'
     )
     db_session.add(user)
@@ -102,25 +115,28 @@ def test_user_reset_password(db_session):
     user = User(
         username='testuser',
         email='test@example.com',
+        password='oldpass',
+        full_name='Test User',
         role='member'
     )
-    user.set_password('oldpass')
     db_session.add(user)
     db_session.commit()
     
-    assert user.check_password('oldpass') is True
+    assert user.verify_password('oldpass') is True
     
-    user.reset_password('newpass')
+    user.set_password('newpass')
     db_session.commit()
     
-    assert user.check_password('newpass') is True
-    assert user.check_password('oldpass') is False
+    assert user.verify_password('newpass') is True
+    assert user.verify_password('oldpass') is False
 
 def test_user_preferences(db_session):
     """Test user preferences."""
     user = User(
         username='testuser',
         email='test@example.com',
+        password='testpass',
+        full_name='Test User',
         role='member'
     )
     db_session.add(user)

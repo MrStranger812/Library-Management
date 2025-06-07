@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from flask import request, abort, current_app
 from utils.logger import get_logger
 from utils.cache import cache
+from flask_login import current_user
+from functools import wraps
 
 logger = get_logger('security')
 
@@ -235,3 +237,19 @@ class Security:
                 return f(*args, **kwargs)
             return wrapped
         return decorator
+
+def permission_required(permission):
+    """
+    Decorator to require a specific permission for a route.
+    Usage: @permission_required('manage_tags')
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if not current_user.is_authenticated:
+                abort(401, "Authentication required")
+            if not hasattr(current_user, 'has_permission') or not current_user.has_permission(permission):
+                abort(403, "Permission denied")
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
