@@ -7,15 +7,15 @@ from utils.middleware import security_headers, validate_request, require_https, 
 def create_app(config=None):
     app = Flask(__name__)
     
-    # Load default configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = db_config.SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = db_config.SQLALCHEMY_TRACK_MODIFICATIONS
-    app.config['SQLALCHEMY_ECHO'] = db_config.SQLALCHEMY_ECHO
-    app.config.update(db_config.SQLALCHEMY_ENGINE_OPTIONS)
-    
     # Load custom configuration if provided
     if config:
-        app.config.update(config)
+        app.config.from_object(config)
+    else:
+        # Load default configuration
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_config.SQLALCHEMY_DATABASE_URI
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = db_config.SQLALCHEMY_TRACK_MODIFICATIONS
+        app.config['SQLALCHEMY_ECHO'] = db_config.SQLALCHEMY_ECHO
+        app.config.update(db_config.SQLALCHEMY_ENGINE_OPTIONS)
     
     # Initialize extensions
     db.init_app(app)
@@ -46,8 +46,11 @@ def create_app(config=None):
     app.register_blueprint(audit_bp)
     
     # Register error handlers
-    from utils.error_handlers import register_error_handlers
-    register_error_handlers(app)
+    from utils.error_handler import ErrorHandler
+    ErrorHandler.register_error_handlers(app)
+    
+    # Import all models to ensure tables are registered
+    import models
     
     # Register middleware
     app.before_request(security_headers)

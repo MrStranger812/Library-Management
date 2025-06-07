@@ -1,7 +1,28 @@
 import os
 from dotenv import load_dotenv
+import logging
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Load environment variables
 load_dotenv()
+
+# Debug: Print environment variables
+logger.debug(f"MYSQL_USER: {os.getenv('MYSQL_USER')}")
+logger.debug(f"MYSQL_HOST: {os.getenv('MYSQL_HOST')}")
+logger.debug(f"MYSQL_PORT: {os.getenv('MYSQL_PORT')}")
+logger.debug(f"MYSQL_DB: {os.getenv('MYSQL_DB')}")
+# Don't log the password for security reasons
+
+# Update SQLALCHEMY_DATABASE_URI to use environment variables for MySQL credentials
+SQLALCHEMY_DATABASE_URI = (
+    f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}"
+    f"@{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/{os.getenv('MYSQL_DB')}"
+)
+
+logger.debug(f"Database URI: {SQLALCHEMY_DATABASE_URI.replace(os.getenv('MYSQL_PASSWORD', ''), '****')}")
 
 class Config:
     # Database Configuration

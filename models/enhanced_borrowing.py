@@ -1,105 +1,160 @@
-from utils.db_manager import get_db_cursor, execute_query
+"""
+Enhanced Borrowing model for the Library Management System.
+Provides advanced borrowing management functionality with detailed information.
+"""
+
+from models import db
+from datetime import UTC, datetime, timedelta, date
+from sqlalchemy import func, and_, or_, desc, case
+from sqlalchemy.orm import joinedload
+from typing import List, Dict, Optional, Tuple
 
 class EnhancedBorrowing:
+    """Class providing enhanced borrowing management functionality."""
+
     @staticmethod
-    def borrow_book_copy(user_id, copy_id, custom_duration=None):
-        """Borrow a specific book copy"""
-        with get_db_cursor() as cursor:
-            # Get user's membership details
-            membership_query = """
-                SELECT mt.max_books_allowed, mt.loan_duration_days
-                FROM user_memberships um
-                JOIN membership_types mt ON um.membership_type_id = mt.membership_type_id
-                WHERE um.user_id = %s AND um.is_active = TRUE
-                ORDER BY um.end_date DESC LIMIT 1
-            """
-            cursor.execute(membership_query, (user_id,))
-            membership = cursor.fetchone()
-            
-            if not membership:
-                return False, "No valid membership found"
-            
-            # Check current borrowing count
-            count_query = """
-                SELECT COUNT(*) as count FROM borrowings 
-                WHERE user_id = %s AND status IN ('borrowed', 'overdue')
-            """
-            cursor.execute(count_query, (user_id,))
-            current_count = cursor.fetchone()[0]
-            
-            if current_count >= membership[0]:  # max_books_allowed
-                return False, f"Maximum borrowing limit ({membership[0]}) reached"
-            
-            # Check if copy is available
-            copy_query = """
-                SELECT bc.book_id, bc.is_available, b.title
-                FROM book_copies bc
-                JOIN books b ON bc.book_id = b.book_id
-                WHERE bc.copy_id = %s
-            """
-            cursor.execute(copy_query, (copy_id,))
-            copy_info = cursor.fetchone()
-            
-            if not copy_info:
-                return False, "Book copy not found"
-            
-            if not copy_info[1]:  # is_available
-                return False, "Book copy is not available"
-            
-            # Calculate due date
-            from datetime import date, timedelta
-            loan_duration = custom_duration or membership[1]  # loan_duration_days
-            due_date = date.today() + timedelta(days=loan_duration)
-            
-            # Create borrowing record
-            borrow_query = """
-                INSERT INTO borrowings (user_id, book_id, copy_id, borrow_date, due_date, status)
-                VALUES (%s, %s, %s, CURDATE(), %s, 'borrowed')
-            """
-            cursor.execute(borrow_query, (user_id, copy_info[0], copy_id, due_date))
-            borrowing_id = cursor.lastrowid
-            
-            # Update copy availability
-            update_query = "UPDATE book_copies SET is_available = FALSE WHERE copy_id = %s"
-            cursor.execute(update_query, (copy_id,))
-            
-            # Update book availability count
-            update_book_query = """
-                UPDATE books SET copies_available = copies_available - 1 
-                WHERE book_id = %s
-            """
-            cursor.execute(update_book_query, (copy_info[0],))
-            
-            return True, f"Book '{copy_info[2]}' borrowed successfully. Due date: {due_date}"
-    
-    @staticmethod
-    def get_user_borrowings_detailed(user_id):
-        """Get detailed borrowing information for a user"""
-        query = """
-            SELECT 
-                b.borrowing_id, b.borrow_date, b.due_date, b.return_date, b.status,
-                bk.title, bk.isbn,
-                CONCAT(a.first_name, ' ', a.last_name) as author,
-                bc.barcode, bc.condition_status,
-                br.name as branch_name,
-                CASE 
-                    WHEN b.status IN ('borrowed', 'overdue') AND b.due_date < CURDATE() 
-                    THEN DATEDIFF(CURDATE(), b.due_date)
-                    ELSE 0 
-                END as days_overdue,
-                COALESCE(SUM(f.amount), 0) as total_fines,
-                COALESCE(SUM(CASE WHEN f.is_paid THEN 0 ELSE f.amount END), 0) as unpaid_fines
-            FROM borrowings b
-            JOIN books bk ON b.book_id = bk.book_id
-            LEFT JOIN book_copies bc ON b.copy_id = bc.copy_id
-            LEFT JOIN library_branches br ON bc.branch_id = br.branch_id
-            LEFT JOIN book_authors ba ON bk.book_id = ba.book_id AND ba.role = 'author'
-            LEFT JOIN authors a ON ba.author_id = a.author_id
-            LEFT JOIN fines f ON b.borrowing_id = f.borrowing_id
-            WHERE b.user_id = %s
-            GROUP BY b.borrowing_id
-            ORDER BY 
-                CASE WHEN b.status IN ('borrowed', 'overdue') THEN 0 ELSE 1 END,
-                b.borrow_date DESC
+    def borrow_book_copy(user_id: int, copy_id: int, custom_duration: Optional[int] = None) -> Tuple[bool, str]:
         """
-        return execute_query(query, (user_id,), dictionary=True)
+        Borrow a specific book copy for a user, enforcing membership and borrowing rules.
+        
+        Args:
+            user_id (int): ID of the user borrowing the book
+            copy_id (int): ID of the book copy
+            custom_duration (int, optional): Custom loan duration in days
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        from models.user_membership import UserMembership
+        from models.membership_type import MembershipType
+        from models.book import Book
+        from models.borrowing import Borrowing
+        from models.fine import Fine
+        from models.book_copy import BookCopy
+
+        # Get user's active membership
+        membership = (
+            db.session.query(UserMembership, MembershipType)
+            .join(MembershipType, UserMembership.membership_type_id == MembershipType.membership_type_id)
+            .filter(UserMembership.user_id == user_id, UserMembership.is_active == True)
+            .order_by(UserMembership.end_date.desc())
+            .first()
+        )
+        if not membership:
+            return False, "No valid membership found"
+        max_books_allowed = membership[1].max_books_allowed
+        loan_duration_days = membership[1].loan_duration_days
+
+        # Check current borrowing count
+        current_count = (
+            db.session.query(func.count(Borrowing.borrowing_id))
+            .filter(Borrowing.user_id == user_id, Borrowing.status.in_(['borrowed', 'overdue']))
+            .scalar()
+        )
+        if current_count >= max_books_allowed:
+            return False, f"Maximum borrowing limit ({max_books_allowed}) reached"
+
+        # Check if copy is available
+        copy = db.session.query(BookCopy).filter_by(copy_id=copy_id).first()
+        if not copy:
+            return False, "Book copy not found"
+        if not copy.is_available:
+            return False, "Book copy is not available"
+
+        # Calculate due date
+        loan_duration = custom_duration or loan_duration_days
+        due_date = date.today() + timedelta(days=loan_duration)
+
+        # Create borrowing record
+        borrowing = Borrowing(
+            user_id=user_id,
+            book_id=copy.book_id,
+            copy_id=copy_id,
+            borrow_date=date.today(),
+            due_date=due_date,
+            status='borrowed'
+        )
+        db.session.add(borrowing)
+
+        # Update copy availability
+        copy.is_available = False
+
+        # Update book availability count
+        book = db.session.query(Book).filter_by(book_id=copy.book_id).first()
+        if book:
+            book.copies_available = book.copies_available - 1
+
+        try:
+            db.session.commit()
+            return True, f"Book '{book.title if book else ''}' borrowed successfully. Due date: {due_date}"
+        except Exception as e:
+            db.session.rollback()
+            return False, f"Error borrowing book: {str(e)}"
+
+    @staticmethod
+    def get_user_borrowings_detailed(user_id: int) -> List[Dict]:
+        """
+        Get detailed borrowing information for a user, including book, copy, branch, author, and fine details.
+        
+        Args:
+            user_id (int): ID of the user
+        Returns:
+            List[Dict]: List of dictionaries with borrowing details
+        """
+        from models.borrowing import Borrowing
+        from models.book import Book
+        from models.book_copy import BookCopy
+        from models.library import LibraryBranch
+        from models.book_author import BookAuthor
+        from models.author import Author
+        from models.fine import Fine
+
+        # Query borrowings with joins
+        borrowings = (
+            db.session.query(Borrowing)
+            .options(
+                joinedload(Borrowing.book),
+                joinedload(Borrowing.copy).joinedload(BookCopy.branch),
+                joinedload(Borrowing.book).joinedload(Book.authors),
+                joinedload(Borrowing.fines)
+            )
+            .filter(Borrowing.user_id == user_id)
+            .order_by(
+                case([(Borrowing.status.in_(['borrowed', 'overdue']), 0)], else_=1),
+                Borrowing.borrow_date.desc()
+            )
+            .all()
+        )
+        result = []
+        for b in borrowings:
+            # Get main author
+            main_author = None
+            for ba in b.book.authors:
+                if hasattr(ba, 'role') and ba.role == 'author':
+                    main_author = f"{ba.first_name} {ba.last_name}"
+                    break
+            if not main_author and b.book.authors:
+                main_author = f"{b.book.authors[0].first_name} {b.book.authors[0].last_name}"
+            # Calculate days overdue
+            days_overdue = 0
+            if b.status in ('borrowed', 'overdue') and b.due_date and b.due_date < date.today():
+                days_overdue = (date.today() - b.due_date).days
+            # Calculate fines
+            total_fines = sum(f.amount for f in b.fines)
+            unpaid_fines = sum(f.amount for f in b.fines if not f.is_paid)
+            result.append({
+                'borrowing_id': b.borrowing_id,
+                'borrow_date': b.borrow_date.isoformat() if b.borrow_date else None,
+                'due_date': b.due_date.isoformat() if b.due_date else None,
+                'return_date': b.return_date.isoformat() if b.return_date else None,
+                'status': b.status,
+                'title': b.book.title if b.book else None,
+                'isbn': b.book.isbn if b.book else None,
+                'author': main_author,
+                'barcode': b.copy.barcode if b.copy else None,
+                'condition_status': b.copy.condition_status if b.copy else None,
+                'branch_name': b.copy.branch.name if b.copy and b.copy.branch else None,
+                'days_overdue': days_overdue,
+                'total_fines': total_fines,
+                'unpaid_fines': unpaid_fines
+            })
+        return result

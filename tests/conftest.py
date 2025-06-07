@@ -1,6 +1,6 @@
 import pytest
 from flask import Flask
-from app import create_app
+from app import get_app
 from extensions import db
 import os
 import tempfile
@@ -10,11 +10,7 @@ from tests.test_config import TestConfig
 @pytest.fixture(scope='session')
 def app():
     """Create and configure a Flask app for testing."""
-    app = create_app(TestConfig)
-    
-    # Create a temporary directory for the test database
-    db_fd, db_path = tempfile.mkstemp()
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    app = get_app(config=TestConfig)
     
     # Create the database and load test data
     with app.app_context():
@@ -28,10 +24,6 @@ def app():
     with app.app_context():
         db.session.remove()
         db.drop_all()
-    
-    # Remove the temporary database file
-    os.close(db_fd)
-    os.unlink(db_path)
 
 @pytest.fixture(scope='function')
 def client(app):

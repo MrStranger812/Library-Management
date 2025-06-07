@@ -1,15 +1,21 @@
-from datetime import datetime
-from extensions import db
+"""
+UserPreference model for the Library Management System.
+Manages user-specific settings and preferences for the library interface.
+"""
+
+from datetime import UTC, datetime
+from models import db
 
 class UserPreference(db.Model):
+    """Model for storing user preferences and settings."""
     __tablename__ = 'user_preferences'
     
     preference_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
     
     # Notification Preferences
-    email_notifications = db.Column(db.Boolean, default=True)
-    sms_notifications = db.Column(db.Boolean, default=False)
+    email_notifications = db.Column(db.Boolean, default=True, index=True)
+    sms_notifications = db.Column(db.Boolean, default=False, index=True)
     notification_types = db.Column(db.JSON, default=lambda: {
         'due_date': True,
         'overdue': True,
@@ -18,13 +24,17 @@ class UserPreference(db.Model):
     })
     
     # Display Preferences
-    theme = db.Column(db.String(20), default='light')  # light, dark, system
-    language = db.Column(db.String(10), default='en')  # en, es, fr, etc.
+    THEMES = ['light', 'dark', 'system']
+    LANGUAGES = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko']
+    
+    theme = db.Column(db.String(20), default='light', index=True)  # light, dark, system
+    language = db.Column(db.String(10), default='en', index=True)  # en, es, fr, etc.
     items_per_page = db.Column(db.Integer, default=10)
     show_cover_images = db.Column(db.Boolean, default=True)
     
     # Search Preferences
-    default_search_type = db.Column(db.String(20), default='title')  # title, author, isbn, etc.
+    SEARCH_TYPES = ['title', 'author', 'isbn', 'category', 'tag', 'keyword']
+    default_search_type = db.Column(db.String(20), default='title', index=True)
     search_history = db.Column(db.JSON, default=list)
     saved_searches = db.Column(db.JSON, default=list)
     
@@ -37,24 +47,32 @@ class UserPreference(db.Model):
     })
     
     # Privacy Preferences
-    show_reading_history = db.Column(db.Boolean, default=True)
-    show_reviews = db.Column(db.Boolean, default=True)
-    allow_recommendations = db.Column(db.Boolean, default=True)
+    show_reading_history = db.Column(db.Boolean, default=True, index=True)
+    show_reviews = db.Column(db.Boolean, default=True, index=True)
+    allow_recommendations = db.Column(db.Boolean, default=True, index=True)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
     
     # Relationships
-    user = db.relationship('User', backref=db.backref('preferences', uselist=False))
+    user = db.relationship('User', backref=db.backref('preferences', uselist=False, lazy='joined'))
     
     def __init__(self, user_id, **kwargs):
+        """Initialize user preferences with default values."""
         self.user_id = user_id
         for key, value in kwargs.items():
             if hasattr(self, key):
+                if key == 'theme' and value not in self.THEMES:
+                    raise ValueError(f"Invalid theme. Must be one of: {', '.join(self.THEMES)}")
+                if key == 'language' and value not in self.LANGUAGES:
+                    raise ValueError(f"Invalid language. Must be one of: {', '.join(self.LANGUAGES)}")
+                if key == 'default_search_type' and value not in self.SEARCH_TYPES:
+                    raise ValueError(f"Invalid search type. Must be one of: {', '.join(self.SEARCH_TYPES)}")
                 setattr(self, key, value)
     
     def to_dict(self):
+        """Convert preferences to dictionary representation."""
         return {
             'preference_id': self.preference_id,
             'user_id': self.user_id,
@@ -75,15 +93,25 @@ class UserPreference(db.Model):
             'show_reviews': self.show_reviews,
             'allow_recommendations': self.allow_recommendations,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'user': {
+                'username': self.user.username,
+                'full_name': self.user.full_name
+            } if self.user else None
         }
     
     def update_preferences(self, **kwargs):
         """Update user preferences with the provided values."""
         for key, value in kwargs.items():
             if hasattr(self, key):
+                if key == 'theme' and value not in self.THEMES:
+                    raise ValueError(f"Invalid theme. Must be one of: {', '.join(self.THEMES)}")
+                if key == 'language' and value not in self.LANGUAGES:
+                    raise ValueError(f"Invalid language. Must be one of: {', '.join(self.LANGUAGES)}")
+                if key == 'default_search_type' and value not in self.SEARCH_TYPES:
+                    raise ValueError(f"Invalid search type. Must be one of: {', '.join(self.SEARCH_TYPES)}")
                 setattr(self, key, value)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def add_search_to_history(self, search_query):
         """Add a search query to the search history."""
@@ -99,6 +127,7 @@ class UserPreference(db.Model):
         
         # Keep only last 10 searches
         self.search_history = self.search_history[:10]
+        self.updated_at = datetime.now(UTC)
     
     def save_search(self, search_name, search_params):
         """Save a search with a name for future use."""
@@ -111,16 +140,18 @@ class UserPreference(db.Model):
                 self.saved_searches[i] = {
                     'name': search_name,
                     'params': search_params,
-                    'created_at': datetime.utcnow().isoformat()
+                    'created_at': datetime.now(UTC).isoformat()
                 }
+                self.updated_at = datetime.now(UTC)
                 return
         
         # Add new saved search
         self.saved_searches.append({
             'name': search_name,
             'params': search_params,
-            'created_at': datetime.utcnow().isoformat()
+            'created_at': datetime.now(UTC).isoformat()
         })
+        self.updated_at = datetime.now(UTC)
     
     def remove_saved_search(self, search_name):
         """Remove a saved search by name."""
@@ -131,6 +162,7 @@ class UserPreference(db.Model):
             search for search in self.saved_searches
             if search['name'] != search_name
         ]
+        self.updated_at = datetime.now(UTC)
     
     def update_reading_goals(self, books_per_year=None, pages_per_day=None):
         """Update reading goals."""
@@ -138,9 +170,10 @@ class UserPreference(db.Model):
             self.reading_goals = {}
         
         if books_per_year is not None:
-            self.reading_goals['books_per_year'] = books_per_year
+            self.reading_goals['books_per_year'] = max(0, books_per_year)
         if pages_per_day is not None:
-            self.reading_goals['pages_per_day'] = pages_per_day
+            self.reading_goals['pages_per_day'] = max(0, pages_per_day)
+        self.updated_at = datetime.now(UTC)
     
     def add_preferred_category(self, category):
         """Add a category to preferred categories."""
@@ -149,6 +182,7 @@ class UserPreference(db.Model):
         
         if category not in self.preferred_categories:
             self.preferred_categories.append(category)
+            self.updated_at = datetime.now(UTC)
     
     def remove_preferred_category(self, category):
         """Remove a category from preferred categories."""
@@ -157,6 +191,7 @@ class UserPreference(db.Model):
         
         if category in self.preferred_categories:
             self.preferred_categories.remove(category)
+            self.updated_at = datetime.now(UTC)
     
     def add_preferred_author(self, author_id):
         """Add an author to preferred authors."""
@@ -165,6 +200,7 @@ class UserPreference(db.Model):
         
         if author_id not in self.preferred_authors:
             self.preferred_authors.append(author_id)
+            self.updated_at = datetime.now(UTC)
     
     def remove_preferred_author(self, author_id):
         """Remove an author from preferred authors."""
@@ -173,6 +209,7 @@ class UserPreference(db.Model):
         
         if author_id in self.preferred_authors:
             self.preferred_authors.remove(author_id)
+            self.updated_at = datetime.now(UTC)
     
     @classmethod
     def get_by_user_id(cls, user_id):
@@ -182,4 +219,25 @@ class UserPreference(db.Model):
     @classmethod
     def create_default(cls, user_id):
         """Create default preferences for a new user."""
-        return cls(user_id=user_id) 
+        return cls(user_id=user_id)
+    
+    @classmethod
+    def get_users_by_notification_preference(cls, notification_type, enabled=True):
+        """Get users with specific notification preference."""
+        return cls.query.filter(
+            cls.notification_types[notification_type].astext.cast(db.Boolean) == enabled
+        ).all()
+    
+    @classmethod
+    def get_users_by_theme(cls, theme):
+        """Get users with specific theme preference."""
+        return cls.query.filter_by(theme=theme).all()
+    
+    @classmethod
+    def get_users_by_language(cls, language):
+        """Get users with specific language preference."""
+        return cls.query.filter_by(language=language).all()
+    
+    def __repr__(self):
+        """String representation of the user preferences."""
+        return f'<UserPreference {self.preference_id}: User {self.user_id}>' 

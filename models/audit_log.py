@@ -1,6 +1,11 @@
-from datetime import datetime
-from extensions import db
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
+"""
+AuditLog model for the Library Management System.
+Tracks system actions and changes for security and accountability purposes.
+"""
+
+from datetime import UTC, datetime, timedelta
+from models import db
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
 class AuditLog(db.Model):
@@ -8,20 +13,51 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 
     log_id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=True)
-    action = Column(String(50), nullable=False)
-    resource_type = Column(String(50), nullable=False)
-    resource_id = Column(Integer, nullable=True)
+    user_id = Column(Integer, ForeignKey('users.user_id', ondelete='SET NULL'), nullable=True, index=True)
+    action = Column(String(50), nullable=False, index=True)
+    resource_type = Column(String(50), nullable=False, index=True)
+    resource_id = Column(Integer, nullable=True, index=True)
     details = Column(JSON, nullable=True)
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False, index=True)
 
     # Relationships
-    user = relationship('User', backref='audit_logs')
+    user = relationship('User', backref=db.backref('audit_logs', lazy='dynamic'))
+
+    # Common action types
+    ACTIONS = {
+        'CREATE': 'create',
+        'UPDATE': 'update',
+        'DELETE': 'delete',
+        'LOGIN': 'login',
+        'LOGOUT': 'logout',
+        'BORROW': 'borrow',
+        'RETURN': 'return',
+        'RESERVE': 'reserve',
+        'CANCEL': 'cancel',
+        'PAYMENT': 'payment'
+    }
+
+    # Common resource types
+    RESOURCE_TYPES = {
+        'USER': 'user',
+        'BOOK': 'book',
+        'BORROWING': 'borrowing',
+        'RESERVATION': 'reservation',
+        'FINE': 'fine',
+        'EVENT': 'event',
+        'MEMBERSHIP': 'membership'
+    }
 
     def __init__(self, action, resource_type, user_id=None, resource_id=None, 
                  details=None, ip_address=None, user_agent=None):
+        """Initialize a new audit log entry."""
+        if action not in self.ACTIONS.values():
+            raise ValueError(f"Invalid action. Must be one of: {', '.join(self.ACTIONS.values())}")
+        if resource_type not in self.RESOURCE_TYPES.values():
+            raise ValueError(f"Invalid resource type. Must be one of: {', '.join(self.RESOURCE_TYPES.values())}")
+        
         self.action = action
         self.resource_type = resource_type
         self.user_id = user_id
@@ -31,7 +67,7 @@ class AuditLog(db.Model):
         self.user_agent = user_agent
 
     def to_dict(self):
-        """Convert audit log to dictionary."""
+        """Convert audit log to dictionary representation."""
         return {
             'log_id': self.log_id,
             'user_id': self.user_id,
@@ -41,7 +77,11 @@ class AuditLog(db.Model):
             'details': self.details,
             'ip_address': self.ip_address,
             'user_agent': self.user_agent,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'user': {
+                'username': self.user.username,
+                'full_name': self.user.full_name
+            } if self.user else None
         }
 
     @classmethod
@@ -60,6 +100,11 @@ class AuditLog(db.Model):
         db.session.add(log)
         db.session.commit()
         return log
+
+    @classmethod
+    def get_by_id(cls, log_id):
+        """Get an audit log by its ID."""
+        return cls.query.get(log_id)
 
     @classmethod
     def get_by_resource(cls, resource_type, resource_id):
@@ -90,4 +135,27 @@ class AuditLog(db.Model):
     @classmethod
     def get_recent_logs(cls, limit=100):
         """Get the most recent audit logs."""
-        return cls.query.order_by(cls.created_at.desc()).limit(limit).all() 
+        return cls.query.order_by(cls.created_at.desc()).limit(limit).all()
+
+    @classmethod
+    def get_user_activity(cls, user_id, days=30):
+        """Get user activity logs for the last N days."""
+        start_date = datetime.now(UTC) - timedelta(days=days)
+        return cls.query.filter(
+            cls.user_id == user_id,
+            cls.created_at >= start_date
+        ).order_by(cls.created_at.desc()).all()
+
+    @classmethod
+    def get_resource_history(cls, resource_type, resource_id, days=30):
+        """Get resource history for the last N days."""
+        start_date = datetime.now(UTC) - timedelta(days=days)
+        return cls.query.filter(
+            cls.resource_type == resource_type,
+            cls.resource_id == resource_id,
+            cls.created_at >= start_date
+        ).order_by(cls.created_at.desc()).all()
+
+    def __repr__(self):
+        """String representation of the audit log."""
+        return f'<AuditLog {self.log_id}: {self.action} on {self.resource_type}>' 
