@@ -25,6 +25,9 @@ class AuditLog(db.Model):
     # Relationships
     user = relationship('User', backref=db.backref('audit_logs', lazy='dynamic'))
 
+    # Table configuration
+    __table_args__ = {'extend_existing': True}
+
     # Common action types
     ACTIONS = {
         'CREATE': 'create',

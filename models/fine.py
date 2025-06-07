@@ -8,6 +8,7 @@ from models import db
 
 class Fine(db.Model):
     __tablename__ = 'fines'
+    __table_args__ = {'extend_existing': True}
     
     fine_id = db.Column(db.Integer, primary_key=True)
     borrowing_id = db.Column(db.Integer, db.ForeignKey('borrowings.borrowing_id', ondelete='CASCADE'), nullable=False, index=True)

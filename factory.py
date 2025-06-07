@@ -4,6 +4,32 @@ from extensions import db, bcrypt, login_manager
 from utils.security import Security
 from utils.middleware import security_headers, validate_request, require_https, validate_json_schema, log_request, handle_cors
 
+# Import models in the correct order to avoid circular dependencies
+from models import db, init_models
+from models.user import User
+from models.book import Book
+from models.author import Author
+from models.publisher import Publisher
+from models.category import Category
+from models.book_copy import BookCopy
+from models.borrowing import Borrowing
+from models.membership_type import MembershipType
+from models.user_membership import UserMembership
+from models.enhanced_book import EnhancedBook
+from models.enhanced_borrowing import EnhancedBorrowing
+from models.library_event import LibraryEvent
+from models.event_registration import EventRegistration
+from models.fine import Fine
+from models.review import Review
+from models.reservation import Reservation
+from models.tag import Tag
+from models.book_tag import BookTag
+from models.notification import Notification
+from models.audit_log import AuditLog
+from models.user_preference import UserPreference
+from models.reports import Reports
+from models.branch import Branch
+
 def create_app(config=None):
     app = Flask(__name__)
     
@@ -49,9 +75,6 @@ def create_app(config=None):
     from utils.error_handler import ErrorHandler
     ErrorHandler.register_error_handlers(app)
     
-    # Import all models to ensure tables are registered
-    import models
-    
     # Register middleware
     app.before_request(security_headers)
     app.before_request(validate_request)
@@ -61,6 +84,6 @@ def create_app(config=None):
     
     # Create database tables
     with app.app_context():
-        db.create_all()
+        init_models()
     
     return app 

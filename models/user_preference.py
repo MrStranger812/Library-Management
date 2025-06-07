@@ -9,6 +9,7 @@ from models import db
 class UserPreference(db.Model):
     """Model for storing user preferences and settings."""
     __tablename__ = 'user_preferences'
+    __table_args__ = {'extend_existing': True}
     
     preference_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)

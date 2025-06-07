@@ -1,6 +1,6 @@
 """
 Library models for the Library Management System.
-Includes LibraryBranch, MembershipType, UserMembership, LibraryEvent, and EventRegistration models.
+Includes LibraryBranch, MembershipType, and UserMembership models.
 """
 
 from models import db
@@ -182,79 +182,5 @@ class UserMembership(db.Model):
 
     def cancel(self):
         """Cancel the membership."""
-        self.status = 'cancelled'
-        db.session.commit()
-
-class LibraryEvent(db.Model):
-    __tablename__ = 'library_events'
-    
-    event_id = db.Column(db.Integer, primary_key=True)
-    branch_id = db.Column(db.Integer, db.ForeignKey('library_branches.branch_id', ondelete='CASCADE'), nullable=False, index=True)
-    title = db.Column(db.String(200), nullable=False, index=True)
-    description = db.Column(db.Text)
-    event_date = db.Column(db.DateTime, nullable=False, index=True)
-    duration = db.Column(db.Integer)  # in minutes
-    capacity = db.Column(db.Integer)
-    registration_required = db.Column(db.Boolean, default=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    registrations = db.relationship('EventRegistration', backref='event', lazy=True, cascade='all, delete-orphan')
-
-    def __init__(self, branch_id, title, event_date, description=None, duration=None, 
-                 capacity=None, registration_required=False):
-        self.branch_id = branch_id
-        self.title = title
-        self.event_date = event_date
-        self.description = description
-        self.duration = duration
-        self.capacity = capacity
-        self.registration_required = registration_required
-
-    @classmethod
-    def get_by_id(cls, event_id):
-        """Get an event by its ID."""
-        return cls.query.get(event_id)
-
-    @classmethod
-    def get_upcoming_events(cls):
-        """Get all upcoming events."""
-        return cls.query.filter(cls.event_date > datetime.utcnow()).all()
-
-class EventRegistration(db.Model):
-    __tablename__ = 'event_registrations'
-    
-    registration_id = db.Column(db.Integer, primary_key=True)
-    event_id = db.Column(db.Integer, db.ForeignKey('library_events.event_id', ondelete='CASCADE'), nullable=False, index=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
-    registration_date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
-    status = db.Column(db.Enum('registered', 'attended', 'cancelled', 'no_show'), default='registered', index=True)
-    notes = db.Column(db.Text)
-
-    # Relationships
-    user = db.relationship('User', backref='event_registrations')
-
-    def __init__(self, event_id, user_id):
-        self.event_id = event_id
-        self.user_id = user_id
-
-    @classmethod
-    def get_by_id(cls, registration_id):
-        """Get a registration by its ID."""
-        return cls.query.get(registration_id)
-
-    @classmethod
-    def get_event_registrations(cls, event_id):
-        """Get all registrations for an event."""
-        return cls.query.filter_by(event_id=event_id).all()
-
-    def mark_attended(self):
-        """Mark the registration as attended."""
-        self.status = 'attended'
-        db.session.commit()
-
-    def cancel(self):
-        """Cancel the registration."""
         self.status = 'cancelled'
         db.session.commit() 

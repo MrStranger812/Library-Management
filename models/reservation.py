@@ -30,6 +30,7 @@ class Reservation(db.Model):
         Index('idx_reservation_status', 'status'),
         Index('idx_reservation_date', 'reservation_date'),
         CheckConstraint("status IN ('pending', 'fulfilled', 'cancelled', 'expired')", name='valid_reservation_status'),
+        {'extend_existing': True}
     )
     
     # Relationships

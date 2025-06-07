@@ -1,5 +1,6 @@
 from datetime import datetime
 from extensions import db
+from models.user import User
 
 class LibraryEvent(db.Model):
     __tablename__ = 'library_events'
