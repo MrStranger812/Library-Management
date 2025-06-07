@@ -38,19 +38,24 @@ def runner(app):
 @pytest.fixture(scope='function')
 def db_session(app):
     """Creates a new database session for a test."""
-    connection = db.engine.connect()
-    transaction = connection.begin()
-    
-    options = dict(bind=connection, binds={})
-    session = db.create_scoped_session(options=options)
-    
-    db.session = session
-    
-    yield session
-    
-    transaction.rollback()
-    connection.close()
-    session.remove()
+    with app.app_context():
+        # Drop and recreate all tables for each test
+        db.drop_all()
+        db.create_all()
+        
+        connection = db.engine.connect()
+        transaction = connection.begin()
+        
+        options = dict(bind=connection, binds={})
+        session = db.create_scoped_session(options=options)
+        
+        db.session = session
+        
+        yield session
+        
+        transaction.rollback()
+        connection.close()
+        session.remove()
 
 @pytest.fixture(scope='function')
 def auth_client(client):

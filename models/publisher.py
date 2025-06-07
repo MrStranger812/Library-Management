@@ -21,7 +21,7 @@ class Publisher(db.Model):
     )
     
     publisher_id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False, index=True)
+    name = Column(String(100), nullable=False, unique=True)
     address = Column(String(200))
     phone = Column(String(20))
     email = Column(String(100), unique=True)

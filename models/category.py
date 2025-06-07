@@ -14,7 +14,7 @@ class Category(db.Model):
     __table_args__ = {'extend_existing': True}
 
     category_id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False, unique=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
     description = Column(Text)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
