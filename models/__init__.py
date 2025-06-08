@@ -1,56 +1,36 @@
 """
-Models package for the Library Management System.
-This module provides access to all database models and handles their initialization.
+Initialize all models for the Library Management System.
+Import order is important for foreign key relationships.
 """
 
-from typing import List, Type
-from flask_sqlalchemy import SQLAlchemy
+from extensions import db
 
-# Initialize SQLAlchemy instance
-db = SQLAlchemy()
-
-# Core models - import User first to ensure users table is created before foreign key references
+# Base models (no foreign keys)
 from models.user import User
-from models.book import Book
-from models.author import Author
 from models.publisher import Publisher
 from models.category import Category
+from models.author import Author
+from models.tag import Tag, BookTag
+
+# Models with foreign keys to base models
+from models.book import Book
 from models.book_copy import BookCopy
-from models.borrowing import Borrowing
+from models.book_author import BookAuthor
+from models.book_review import BookReview
+from models.membership import MembershipType, UserMembership
 
-# Membership related models
-from models.membership_type import MembershipType
-from models.user_membership import UserMembership
-
-# Enhanced functionality models
-from models.enhanced_book import EnhancedBook
-from models.enhanced_borrowing import EnhancedBorrowing
-from models.library_event import LibraryEvent  # Import from library_event.py only
+# Models with foreign keys to previous models
+from models.borrowing import Borrowing, Fine, FinePayment, Reservation
+from models.library_event import LibraryEvent
 from models.event_registration import EventRegistration
+from models.notification import Notification, AuditLog, UserPreference
+from .library_branch import LibraryBranch
 
-# Financial and review models
-from models.fine import Fine
-from models.review import Review
-from models.reservation import Reservation
-
-# Tagging and notification models
-from models.tag import Tag
-from models.book_tag import BookTag
-from models.notification import Notification
-
-# System models
-from models.audit_log import AuditLog
-from models.user_preference import UserPreference
-from models.reports import Reports
-from models.branch import Branch
-
-def init_models() -> None:
-    """
-    Initialize all models and create database tables.
-    This function should be called after the Flask app is created.
-    """
-    # Create all tables in the correct order
-    db.create_all()
+def init_models():
+    """Initialize all models and create database tables."""
+    # This function is a placeholder - tables are created by db.create_all()
+    # when called from the application factory
+    pass
 
 # Export all models
 __all__ = [
@@ -59,22 +39,16 @@ __all__ = [
     'Author',
     'Publisher',
     'Category',
-    'BookCopy',
-    'Borrowing',
+    'BookAuthor',
+    'BookReview',
     'MembershipType',
     'UserMembership',
-    'EnhancedBook',
-    'EnhancedBorrowing',
-    'LibraryEvent',
-    'EventRegistration',
+    'Borrowing',
     'Fine',
-    'Review',
+    'FinePayment',
     'Reservation',
-    'Tag',
-    'BookTag',
+    'LibraryEvent',
     'Notification',
     'AuditLog',
     'UserPreference',
-    'Reports',
-    'Branch',
 ] 

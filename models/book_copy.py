@@ -1,138 +1,103 @@
 """
-BookCopy model for managing individual copies of books in the library system.
+Book copy model for the Library Management System.
+Tracks individual copies of books in the library.
 """
 
-from datetime import datetime, UTC
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, CheckConstraint
-from sqlalchemy.orm import relationship
-from models import db
+from extensions import db
+from datetime import UTC, datetime
 
 class BookCopy(db.Model):
-    """Model representing an individual copy of a book."""
-    
+    """Model for individual book copies."""
     __tablename__ = 'book_copies'
-    __table_args__ = {'extend_existing': True}
     
-    copy_id = Column(Integer, primary_key=True)
-    book_id = Column(Integer, ForeignKey('books.book_id'), nullable=False)
-    barcode = Column(String(50), unique=True, nullable=False)
-    is_available = Column(Boolean, default=True, nullable=False)
-    condition = Column(String(20), default='good', nullable=False)
-    location = Column(String(50))
-    notes = Column(String(500))
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
-    
+    copy_id = db.Column(db.Integer, primary_key=True)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.book_id', ondelete='CASCADE'), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('library_branches.branch_id', ondelete='CASCADE'), nullable=False, index=True)
+    barcode = db.Column(db.String(50), unique=True, index=True)
+    acquisition_date = db.Column(db.Date, default=datetime.now(UTC).date, nullable=False)
+    condition = db.Column(db.Enum('excellent', 'good', 'fair', 'poor', 'damaged'), default='good')
+    location = db.Column(db.String(100))
+    price = db.Column(db.Numeric(10, 2))
+    is_available = db.Column(db.Boolean, default=True, index=True)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+
     # Relationships
-    book = relationship('Book', back_populates='copies')
-    borrowings = relationship('Borrowing', back_populates='copy')
-    
-    # Constraints
-    __table_args__ = (
-        CheckConstraint(
-            "condition IN ('new', 'good', 'fair', 'poor', 'damaged')",
-            name='valid_condition'
-        ),
-        {'extend_existing': True}
-    )
-    
-    def __init__(self, book_id, barcode, condition='good', location=None, notes=None):
-        """Initialize a new book copy.
-        
-        Args:
-            book_id (int): ID of the book this copy belongs to
-            barcode (str): Unique barcode for this copy
-            condition (str): Condition of the book copy
-            location (str, optional): Location of the book copy
-            notes (str, optional): Additional notes about the copy
-        """
+    book = db.relationship('Book', back_populates='copies')
+    branch = db.relationship('LibraryBranch', back_populates='book_copies')
+    borrowings = db.relationship('Borrowing', back_populates='book_copy', lazy='dynamic')
+
+    def __init__(self, book_id, branch_id, barcode=None, condition='good', location=None, price=None, notes=None):
+        """Initialize a new book copy."""
         self.book_id = book_id
+        self.branch_id = branch_id
         self.barcode = barcode
         self.condition = condition
         self.location = location
+        self.price = price
         self.notes = notes
         self.is_available = True
-    
-    def __repr__(self):
-        """Return a string representation of the book copy."""
-        return f"<BookCopy {self.barcode} (Book ID: {self.book_id})>"
-    
+
+    @classmethod
+    def get_by_id(cls, copy_id):
+        """Get a book copy by its ID."""
+        return cls.query.get(copy_id)
+
+    @classmethod
+    def get_by_barcode(cls, barcode):
+        """Get a book copy by its barcode."""
+        return cls.query.filter_by(barcode=barcode).first()
+
+    @classmethod
+    def get_available_copies(cls, book_id):
+        """Get all available copies of a book."""
+        return cls.query.filter_by(book_id=book_id, is_available=True).all()
+
+    @classmethod
+    def get_branch_copies(cls, branch_id):
+        """Get all copies in a branch."""
+        return cls.query.filter_by(branch_id=branch_id).all()
+
+    def mark_as_borrowed(self):
+        """Mark the copy as borrowed."""
+        self.is_available = False
+        self.updated_at = datetime.now(UTC)
+        db.session.commit()
+
+    def mark_as_available(self):
+        """Mark the copy as available."""
+        self.is_available = True
+        self.updated_at = datetime.now(UTC)
+        db.session.commit()
+
+    def update_condition(self, new_condition):
+        """Update the condition of the copy."""
+        if new_condition not in ['excellent', 'good', 'fair', 'poor', 'damaged']:
+            raise ValueError("Invalid condition value")
+        self.condition = new_condition
+        self.updated_at = datetime.now(UTC)
+        db.session.commit()
+
     def to_dict(self):
-        """Convert the book copy to a dictionary.
-        
-        Returns:
-            dict: Dictionary representation of the book copy
-        """
+        """Convert book copy to dictionary."""
         return {
             'copy_id': self.copy_id,
             'book_id': self.book_id,
+            'branch_id': self.branch_id,
             'barcode': self.barcode,
-            'is_available': self.is_available,
+            'acquisition_date': self.acquisition_date.isoformat() if self.acquisition_date else None,
             'condition': self.condition,
             'location': self.location,
+            'price': float(self.price) if self.price else None,
+            'is_available': self.is_available,
             'notes': self.notes,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'book': self.book.to_dict() if self.book else None,
+            'branch': self.branch.to_dict() if self.branch else None
         }
-    
-    @classmethod
-    def get_by_barcode(cls, barcode):
-        """Get a book copy by its barcode.
-        
-        Args:
-            barcode (str): Barcode of the book copy
-            
-        Returns:
-            BookCopy: The book copy if found, None otherwise
-        """
-        return cls.query.filter_by(barcode=barcode).first()
-    
-    @classmethod
-    def get_available_copies(cls, book_id):
-        """Get all available copies of a book.
-        
-        Args:
-            book_id (int): ID of the book
-            
-        Returns:
-            list: List of available book copies
-        """
-        return cls.query.filter_by(book_id=book_id, is_available=True).all()
-    
-    @classmethod
-    def get_by_condition(cls, condition):
-        """Get all book copies with a specific condition.
-        
-        Args:
-            condition (str): Condition to filter by
-            
-        Returns:
-            list: List of book copies with the specified condition
-        """
-        return cls.query.filter_by(condition=condition).all()
-    
-    def mark_as_available(self):
-        """Mark the book copy as available."""
-        self.is_available = True
-        self.updated_at = datetime.now(UTC)
-    
-    def mark_as_unavailable(self):
-        """Mark the book copy as unavailable."""
-        self.is_available = False
-        self.updated_at = datetime.now(UTC)
-    
-    def update_condition(self, new_condition):
-        """Update the condition of the book copy.
-        
-        Args:
-            new_condition (str): New condition of the book copy
-            
-        Returns:
-            bool: True if the condition was updated, False otherwise
-        """
-        if new_condition not in ['new', 'good', 'fair', 'poor', 'damaged']:
-            return False
-        
-        self.condition = new_condition
-        self.updated_at = datetime.now(UTC)
-        return True 
+
+    def __repr__(self):
+        """String representation of the book copy."""
+        return f'<BookCopy {self.copy_id}: {self.book.title if self.book else "Unknown Book"} - {self.barcode}>' 

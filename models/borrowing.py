@@ -83,24 +83,45 @@ class Borrowing(db.Model):
             cls.borrow_date <= end_date
         ).order_by(cls.borrow_date.desc()).all()
 
-    def calculate_fine(self):
-        """Calculate fine for overdue book."""
-        if self.status == 'borrowed' and self.due_date < datetime.now(UTC).date():
-            days_overdue = (datetime.now(UTC).date() - self.due_date).days
-            self.fine_amount = days_overdue * 1.0  # $1 per day
-            self.status = 'overdue'
-            db.session.commit()
-            return self.fine_amount
-        return 0.00
+    def is_overdue(self):
+        """Check if the borrowing is overdue."""
+        if self.status == 'returned':
+            return False
+        return self.due_date < datetime.now(UTC).date()
+
+    def days_overdue(self):
+        """Calculate number of days overdue."""
+        if not self.is_overdue():
+            return 0
+        return (datetime.now(UTC).date() - self.due_date).days
+
+    def calculate_fine(self, rate_per_day=1.0):
+        """Calculate fine amount for overdue borrowing."""
+        if not self.is_overdue():
+            return 0.0
+        return self.days_overdue() * rate_per_day
 
     def return_book(self):
-        """Mark book as returned and update related records."""
+        """Mark the book as returned."""
+        if self.status == 'returned':
+            raise ValueError("Book already returned")
+        
         self.return_date = datetime.now(UTC).date()
         self.status = 'returned'
-        if self.copy:
-            self.copy.is_available = True
-            self.copy.updated_at = datetime.now(UTC)
-        self.updated_at = datetime.now(UTC)
+        
+        # Update book availability
+        if self.book:
+            self.book.copies_available += 1
+        db.session.commit()
+
+    def renew(self, extension_days=14):
+        """Renew the borrowing."""
+        if self.status != 'borrowed':
+            raise ValueError("Can only renew active borrowings")
+        if self.is_overdue():
+            raise ValueError("Cannot renew overdue books")
+        
+        self.due_date += timedelta(days=extension_days)
         db.session.commit()
 
     def mark_as_lost(self):

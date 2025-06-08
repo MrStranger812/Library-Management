@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 import logging
+import urllib.parse
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -17,10 +18,34 @@ logger.debug(f"MYSQL_DB: {os.getenv('MYSQL_DB')}")
 # Don't log the password for security reasons
 
 # Update SQLALCHEMY_DATABASE_URI to use environment variables for MySQL credentials
-SQLALCHEMY_DATABASE_URI = (
-    f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}"
-    f"@{os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}/{os.getenv('MYSQL_DB')}"
-)
+user = os.getenv('MYSQL_USER', 'root')
+raw_password = os.getenv('MYSQL_PASSWORD', 'Qwaszxerdfcv56@')
+password = urllib.parse.quote_plus(raw_password)
+host = os.getenv('MYSQL_HOST', '127.0.0.1')
+port = os.getenv('MYSQL_PORT', '3306')
+db = os.getenv('MYSQL_DB', 'library_management')
+
+# Debug print each component
+logger.debug(f"Database components:")
+logger.debug(f"User: {user}")
+logger.debug(f"Host: {host}")
+logger.debug(f"Port: {port}")
+logger.debug(f"Database: {db}")
+
+SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
+
+# Debug print the full URI (with password masked)
+masked_uri = SQLALCHEMY_DATABASE_URI.replace(password, '****')
+logger.debug(f"Full Database URI: {masked_uri}")
+
+# Add SQLAlchemy specific configurations
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+SQLALCHEMY_ECHO = True
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_size': 10,
+    'pool_recycle': 3600,
+    'pool_pre_ping': True
+}
 
 logger.debug(f"Database URI: {SQLALCHEMY_DATABASE_URI.replace(os.getenv('MYSQL_PASSWORD', ''), '****')}")
 

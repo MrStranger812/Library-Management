@@ -1,46 +1,47 @@
 """
 Category model for the Library Management System.
-Represents book categories/genres in the library.
 """
 
-from datetime import UTC, datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime
-from sqlalchemy.orm import relationship
 from models import db
+from datetime import UTC, datetime
 
 class Category(db.Model):
-    """Model representing a book category or genre."""
+    """Model for book categories."""
     __tablename__ = 'categories'
-    __table_args__ = {'extend_existing': True}
+    
+    category_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    description = db.Column(db.Text)
+    parent_category_id = db.Column(db.Integer, db.ForeignKey('categories.category_id', ondelete='SET NULL'), index=True)
+    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
+    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    is_active = db.Column(db.Boolean, default=True, index=True)
 
-    category_id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False, unique=True)
-    description = Column(Text)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
+    # Self-referential relationship for parent-child categories
+    parent = db.relationship('Category', remote_side=[category_id], backref=db.backref('subcategories', lazy='dynamic'))
 
-    # Relationships
-    books = relationship('Book', back_populates='category', lazy='dynamic')
-
-    def __init__(self, name, description=None):
+    def __init__(self, name, description=None, parent_category_id=None):
         """Initialize a new category."""
         self.name = name
         self.description = description
-
-    def __repr__(self):
-        """Return a string representation of the category."""
-        return f"<Category {self.name}>"
+        self.parent_category_id = parent_category_id
+        self.is_active = True
 
     def to_dict(self):
-        """Convert the category to a dictionary."""
+        """Convert category to dictionary."""
         return {
             'category_id': self.category_id,
             'name': self.name,
             'description': self.description,
+            'parent_category_id': self.parent_category_id,
+            'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'book_count': self.books.count() if self.books else 0
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+    def __repr__(self):
+        """String representation of the category."""
+        return f'<Category {self.name}>'
 
     @classmethod
     def get_by_id(cls, category_id):

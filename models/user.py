@@ -146,6 +146,31 @@ class User(UserMixin, db.Model):
         """String representation of the user."""
         return f'<User {self.username}>'
 
+    def active_borrowings_count(self):
+        """Get count of active borrowings."""
+        return self.borrowings.filter_by(status='borrowed').count()
+
+    def get_borrowing_history(self):
+        """Get user's borrowing history."""
+        return self.borrowings.order_by(Borrowing.borrow_date.desc()).all()
+
+    def total_fines(self):
+        """Calculate total fines for the user."""
+        from models.fine import Fine
+        from sqlalchemy import func
+        result = db.session.query(func.sum(Fine.amount)).filter_by(user_id=self.user_id).scalar()
+        return float(result) if result else 0.0
+
+    def pending_fines(self):
+        """Calculate pending (unpaid) fines."""
+        from models.fine import Fine
+        from sqlalchemy import func
+        result = db.session.query(func.sum(Fine.amount)).filter_by(
+            user_id=self.user_id,
+            is_paid=False
+        ).scalar()
+        return float(result) if result else 0.0
+
 class Permission(db.Model):
     """Model for user permissions."""
     __tablename__ = 'permissions'
