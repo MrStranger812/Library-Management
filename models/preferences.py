@@ -1,7 +1,8 @@
 from extensions import db
-from datetime import datetime
+from datetime import datetime, UTC
+from models.base_model import BaseModel
 
-class Preferences(db.Model):
+class Preferences(BaseModel):
     """Model for storing user preferences."""
     __tablename__ = 'preferences'
 
@@ -12,8 +13,6 @@ class Preferences(db.Model):
     email_notifications = db.Column(db.Boolean, default=True)
     sms_notifications = db.Column(db.Boolean, default=False)
     timezone = db.Column(db.String(50), default='UTC')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationship with User model
     user = db.relationship('User', backref=db.backref('preferences', uselist=False))
@@ -22,20 +21,7 @@ class Preferences(db.Model):
         self.user_id = user_id
         for key, value in kwargs.items():
             setattr(self, key, value)
-
-    def to_dict(self):
-        """Convert preferences to dictionary."""
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'theme': self.theme,
-            'language': self.language,
-            'email_notifications': self.email_notifications,
-            'sms_notifications': self.sms_notifications,
-            'timezone': self.timezone,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+        self.is_active = True
 
     @classmethod
     def get_by_user_id(cls, user_id):
@@ -47,6 +33,6 @@ class Preferences(db.Model):
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         db.session.commit()
         return self

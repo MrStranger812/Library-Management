@@ -5,8 +5,9 @@ Includes LibraryBranch, MembershipType, and UserMembership models.
 
 from models import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class LibraryBranch(db.Model):
+class LibraryBranch(BaseModel):
     """Model for library branches."""
     __tablename__ = 'library_branches'
     
@@ -18,8 +19,6 @@ class LibraryBranch(db.Model):
     opening_hours = db.Column(db.Text)
     manager_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='SET NULL'), index=True)
     is_active = db.Column(db.Boolean, default=True, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     manager = db.relationship('User', backref='managed_branches', lazy='joined')
@@ -28,7 +27,6 @@ class LibraryBranch(db.Model):
     borrowings = db.relationship('Borrowing', backref='branch', lazy='dynamic', cascade='all, delete-orphan')
 
     def __init__(self, name, address, phone=None, email=None, opening_hours=None, manager_id=None):
-        """Initialize a new library branch."""
         self.name = name
         self.address = address
         self.phone = phone
@@ -102,7 +100,7 @@ class LibraryBranch(db.Model):
         """String representation of the library branch."""
         return f'<LibraryBranch {self.name}>'
 
-class MembershipType(db.Model):
+class MembershipType(BaseModel):
     __tablename__ = 'membership_types'
     
     type_id = db.Column(db.Integer, primary_key=True)
@@ -112,7 +110,6 @@ class MembershipType(db.Model):
     loan_period = db.Column(db.Integer, nullable=False, default=14)  # in days
     renewal_period = db.Column(db.Integer, nullable=False, default=365)  # in days
     fee = db.Column(db.Numeric(10, 2), nullable=False, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
 
     # Relationships
     memberships = db.relationship('UserMembership', backref='membership_type', lazy=True, cascade='all, delete-orphan')
@@ -124,6 +121,7 @@ class MembershipType(db.Model):
         self.loan_period = loan_period
         self.renewal_period = renewal_period
         self.fee = fee
+        self.is_active = True
 
     @classmethod
     def get_by_id(cls, type_id):
@@ -135,7 +133,7 @@ class MembershipType(db.Model):
         """Get all membership types."""
         return cls.query.all()
 
-class UserMembership(db.Model):
+class UserMembership(BaseModel):
     __tablename__ = 'user_memberships'
     
     membership_id = db.Column(db.Integer, primary_key=True)
@@ -145,8 +143,6 @@ class UserMembership(db.Model):
     end_date = db.Column(db.DateTime, nullable=False, index=True)
     status = db.Column(db.Enum('active', 'expired', 'suspended', 'cancelled'), default='active', index=True)
     payment_status = db.Column(db.Enum('paid', 'pending', 'overdue'), default='pending', index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = db.relationship('User', backref='memberships')
@@ -155,6 +151,7 @@ class UserMembership(db.Model):
         self.user_id = user_id
         self.type_id = type_id
         self.end_date = end_date
+        self.is_active = True
 
     @classmethod
     def get_by_id(cls, membership_id):

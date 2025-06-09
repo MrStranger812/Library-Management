@@ -5,8 +5,9 @@ Fine model for the Library Management System.
 from models import db
 from datetime import UTC, datetime
 from sqlalchemy import CheckConstraint
+from models.base_model import BaseModel
 
-class Fine(db.Model):
+class Fine(BaseModel):
     """Model for fines."""
     __tablename__ = 'fines'
     
@@ -14,10 +15,8 @@ class Fine(db.Model):
     borrowing_id = db.Column(db.Integer, db.ForeignKey('borrowings.borrowing_id', ondelete='CASCADE'), nullable=False, index=True)
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     reason = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
     paid_at = db.Column(db.DateTime, index=True)
     is_paid = db.Column(db.Boolean, default=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     borrowing = db.relationship('Borrowing', back_populates='fines')
@@ -33,6 +32,7 @@ class Fine(db.Model):
         self.amount = amount
         self.reason = reason
         self.is_paid = False
+        self.is_active = True
 
     @classmethod
     def get_unpaid_fines(cls):
@@ -51,19 +51,16 @@ class Fine(db.Model):
         self.updated_at = datetime.now(UTC)
         db.session.commit()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert fine to dictionary."""
-        return {
-            'fine_id': self.fine_id,
-            'borrowing_id': self.borrowing_id,
-            'amount': float(self.amount) if self.amount else 0.00,
-            'reason': self.reason,
-            'is_paid': self.is_paid,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'paid_at': self.paid_at.isoformat() if self.paid_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'payments': [payment.to_dict() for payment in self.payments]
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add fine-specific fields
+        result['amount'] = float(self.amount) if self.amount else 0.00
+        if self.paid_at:
+            result['paid_at'] = self.paid_at.isoformat()
+            
+        return result
 
     def __repr__(self):
         """String representation of the fine."""

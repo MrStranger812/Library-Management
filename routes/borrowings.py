@@ -1,19 +1,26 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import render_template, jsonify, request
 from flask_login import login_required, current_user
 from models.borrowing import Borrowing
 from utils.security import permission_required
 from utils.validation import validate_json_schema_decorator
+from routes.generic_crud_routes import CRUDBlueprint
 
-borrowings_bp = Blueprint('borrowings', __name__)
+# Create the borrowings blueprint with CRUD functionality
+borrowings_crud = CRUDBlueprint(
+    name='borrowings',
+    model_class=Borrowing,
+    permission_prefix='borrowings'
+)
 
-@borrowings_bp.route('/borrowings')
+# Add custom routes
+@borrowings_crud.blueprint.route('/borrowings')
 @login_required
 @permission_required('manage_borrowings')
 def index():
     """Render the borrowings management page."""
     return render_template('borrowings/index.html')
 
-@borrowings_bp.route('/api/borrowings/borrow', methods=['POST'])
+@borrowings_crud.blueprint.route('/api/borrowings/borrow', methods=['POST'])
 @login_required
 @validate_json_schema_decorator({
     'type': 'object',
@@ -36,7 +43,7 @@ def borrow_book():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
-@borrowings_bp.route('/api/borrowings/return', methods=['POST'])
+@borrowings_crud.blueprint.route('/api/borrowings/return', methods=['POST'])
 @login_required
 @permission_required('manage_borrowings')
 @validate_json_schema_decorator({
@@ -62,15 +69,18 @@ def return_book():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
-@borrowings_bp.route('/api/borrowings/user', methods=['GET'])
+@borrowings_crud.blueprint.route('/api/borrowings/user', methods=['GET'])
 @login_required
 def get_user_borrowings():
     borrowings = Borrowing.get_by_user(current_user.user_id)
     return jsonify([borrowing.to_dict() for borrowing in borrowings])
 
-@borrowings_bp.route('/api/borrowings/overdue', methods=['GET'])
+@borrowings_crud.blueprint.route('/api/borrowings/overdue', methods=['GET'])
 @login_required
 @permission_required('manage_borrowings')
 def get_overdue_borrowings():
     borrowings = Borrowing.get_overdue()
-    return jsonify([borrowing.to_dict() for borrowing in borrowings]) 
+    return jsonify([borrowing.to_dict() for borrowing in borrowings])
+
+# Export the blueprint
+borrowings_bp = borrowings_crud.blueprint 

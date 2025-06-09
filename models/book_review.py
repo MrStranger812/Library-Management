@@ -5,8 +5,9 @@ Represents user reviews for books.
 
 from models import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class BookReview(db.Model):
+class BookReview(BaseModel):
     """Model for book reviews."""
     __tablename__ = 'book_reviews'
     

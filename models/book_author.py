@@ -5,15 +5,15 @@ Tracks the relationship between books and authors.
 
 from extensions import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class BookAuthor(db.Model):
+class BookAuthor(BaseModel):
     """Model for book-author relationships."""
     __tablename__ = 'book_authors'
     
     book_id = db.Column(db.Integer, db.ForeignKey('books.book_id', ondelete='CASCADE'), primary_key=True, index=True)
     author_id = db.Column(db.Integer, db.ForeignKey('authors.author_id', ondelete='CASCADE'), primary_key=True, index=True)
     role = db.Column(db.Enum('author', 'co-author', 'editor', 'translator'), default='author')
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False)
 
     # Relationships
     book = db.relationship('Book', back_populates='authors')
@@ -24,6 +24,7 @@ class BookAuthor(db.Model):
         self.book_id = book_id
         self.author_id = author_id
         self.role = role
+        self.is_active = True
 
     @classmethod
     def get_book_authors(cls, book_id):
@@ -34,17 +35,6 @@ class BookAuthor(db.Model):
     def get_author_books(cls, author_id):
         """Get all books by an author."""
         return cls.query.filter_by(author_id=author_id).all()
-
-    def to_dict(self):
-        """Convert book-author relationship to dictionary."""
-        return {
-            'book_id': self.book_id,
-            'author_id': self.author_id,
-            'role': self.role,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'book': self.book.to_dict() if self.book else None,
-            'author': self.author.to_dict() if self.author else None
-        }
 
     def __repr__(self):
         """String representation of the book-author relationship."""

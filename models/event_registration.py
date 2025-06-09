@@ -5,8 +5,9 @@ Tracks user registrations for library events.
 
 from extensions import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class EventRegistration(db.Model):
+class EventRegistration(BaseModel):
     """Model for event registrations."""
     __tablename__ = 'event_registrations'
     
@@ -16,8 +17,6 @@ class EventRegistration(db.Model):
     registration_date = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
     status = db.Column(db.Enum('registered', 'attended', 'cancelled', 'no_show'), default='registered', index=True)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     event = db.relationship('LibraryEvent', back_populates='registrations')
@@ -32,11 +31,7 @@ class EventRegistration(db.Model):
         self.event_id = event_id
         self.user_id = user_id
         self.notes = notes
-
-    @classmethod
-    def get_by_id(cls, registration_id):
-        """Get a registration by its ID."""
-        return cls.query.get(registration_id)
+        self.is_active = True
 
     @classmethod
     def get_event_registrations(cls, event_id, status=None):
@@ -72,20 +67,15 @@ class EventRegistration(db.Model):
         self.updated_at = datetime.now(UTC)
         db.session.commit()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert registration to dictionary."""
-        return {
-            'registration_id': self.registration_id,
-            'event_id': self.event_id,
-            'user_id': self.user_id,
-            'registration_date': self.registration_date.isoformat() if self.registration_date else None,
-            'status': self.status,
-            'notes': self.notes,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'event': self.event.to_dict() if self.event else None,
-            'user': self.user.to_dict() if self.user else None
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add registration-specific fields
+        if self.registration_date:
+            result['registration_date'] = self.registration_date.isoformat()
+            
+        return result
 
     def __repr__(self):
         """String representation of the registration."""

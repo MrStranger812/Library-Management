@@ -6,8 +6,9 @@ Tracks payments made for library fines.
 from models import db
 from datetime import UTC, datetime
 from sqlalchemy import CheckConstraint
+from models.base_model import BaseModel
 
-class FinePayment(db.Model):
+class FinePayment(BaseModel):
     """Model for fine payments."""
     __tablename__ = 'fine_payments'
     
@@ -19,8 +20,6 @@ class FinePayment(db.Model):
     paid_by = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='SET NULL'), index=True)
     paid_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     fine = db.relationship('Fine', back_populates='payments')
@@ -38,6 +37,7 @@ class FinePayment(db.Model):
         self.paid_by = paid_by
         self.payment_reference = payment_reference
         self.notes = notes
+        self.is_active = True
 
     @classmethod
     def get_payments_by_fine(cls, fine_id):
@@ -49,20 +49,16 @@ class FinePayment(db.Model):
         """Get all payments made by a specific user."""
         return cls.query.filter_by(paid_by=user_id).order_by(cls.paid_at.desc()).all()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert payment to dictionary."""
-        return {
-            'payment_id': self.payment_id,
-            'fine_id': self.fine_id,
-            'amount_paid': float(self.amount_paid) if self.amount_paid else 0.00,
-            'payment_method': self.payment_method,
-            'payment_reference': self.payment_reference,
-            'paid_by': self.paid_by,
-            'paid_at': self.paid_at.isoformat() if self.paid_at else None,
-            'notes': self.notes,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add payment-specific fields
+        result['amount_paid'] = float(self.amount_paid) if self.amount_paid else 0.00
+        if self.paid_at:
+            result['paid_at'] = self.paid_at.isoformat()
+            
+        return result
 
     def __repr__(self):
         """String representation of the payment."""

@@ -7,8 +7,9 @@ from models import db
 from datetime import UTC, datetime
 from sqlalchemy import Index, CheckConstraint, and_
 from sqlalchemy.orm import relationship
+from models.base_model import BaseModel
 
-class Review(db.Model):
+class Review(BaseModel):
     """Model representing a book review in the library system."""
     
     __tablename__ = 'reviews'
@@ -19,9 +20,7 @@ class Review(db.Model):
     book_id = db.Column(db.Integer, db.ForeignKey('books.book_id', ondelete='CASCADE'), nullable=False)
     rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
-    
+
     # Indexes
     __table_args__ = (
         Index('idx_review_user', 'user_id'),
@@ -49,6 +48,7 @@ class Review(db.Model):
         self.book_id = book_id
         self.rating = rating
         self.comment = comment
+        self.is_active = True
     
     @classmethod
     def add_review(cls, user_id, book_id, rating, comment):
@@ -158,27 +158,6 @@ class Review(db.Model):
         from sqlalchemy import func
         result = db.session.query(func.avg(cls.rating)).filter_by(book_id=book_id).scalar()
         return round(result, 2) if result else 0
-    
-    def to_dict(self):
-        """
-        Convert review to dictionary.
-        
-        Returns:
-            dict: Dictionary representation of the review
-        """
-        return {
-            'review_id': self.review_id,
-            'user_id': self.user_id,
-            'book_id': self.book_id,
-            'rating': self.rating,
-            'comment': self.comment,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
-            'user': {
-                'username': self.user.username,
-                'full_name': self.user.full_name
-            } if self.user else None
-        }
     
     def __repr__(self):
         """String representation of the review."""

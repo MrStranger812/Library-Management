@@ -5,8 +5,9 @@ Tracks individual copies of books in the library.
 
 from extensions import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class BookCopy(db.Model):
+class BookCopy(BaseModel):
     """Model for individual book copies."""
     __tablename__ = 'book_copies'
     
@@ -20,8 +21,6 @@ class BookCopy(db.Model):
     price = db.Column(db.Numeric(10, 2))
     is_available = db.Column(db.Boolean, default=True, index=True)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     book = db.relationship('Book', back_populates='copies')
@@ -38,11 +37,6 @@ class BookCopy(db.Model):
         self.price = price
         self.notes = notes
         self.is_available = True
-
-    @classmethod
-    def get_by_id(cls, copy_id):
-        """Get a book copy by its ID."""
-        return cls.query.get(copy_id)
 
     @classmethod
     def get_by_barcode(cls, barcode):
@@ -79,24 +73,17 @@ class BookCopy(db.Model):
         self.updated_at = datetime.now(UTC)
         db.session.commit()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert book copy to dictionary."""
-        return {
-            'copy_id': self.copy_id,
-            'book_id': self.book_id,
-            'branch_id': self.branch_id,
-            'barcode': self.barcode,
-            'acquisition_date': self.acquisition_date.isoformat() if self.acquisition_date else None,
-            'condition': self.condition,
-            'location': self.location,
-            'price': float(self.price) if self.price else None,
-            'is_available': self.is_available,
-            'notes': self.notes,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'book': self.book.to_dict() if self.book else None,
-            'branch': self.branch.to_dict() if self.branch else None
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add book copy specific fields
+        if self.acquisition_date:
+            result['acquisition_date'] = self.acquisition_date.isoformat()
+        if self.price:
+            result['price'] = float(self.price)
+            
+        return result
 
     def __repr__(self):
         """String representation of the book copy."""

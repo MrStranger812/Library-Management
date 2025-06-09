@@ -5,8 +5,9 @@ Includes Tag and BookTag models for categorizing books with tags.
 
 from extensions import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class Tag(db.Model):
+class Tag(BaseModel):
     """Model for book tags."""
     __tablename__ = 'tags'
     
@@ -15,8 +16,6 @@ class Tag(db.Model):
     description = db.Column(db.String(200))
     color = db.Column(db.String(7), default='#6c757d')
     created_by = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='SET NULL'), index=True)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     books = db.relationship('BookTag', back_populates='tag', lazy='dynamic')
@@ -28,6 +27,7 @@ class Tag(db.Model):
         self.description = description
         self.color = color
         self.created_by = created_by
+        self.is_active = True
 
     @classmethod
     def get_by_name(cls, name):
@@ -39,23 +39,11 @@ class Tag(db.Model):
         """Get all tags."""
         return cls.query.order_by(cls.name).all()
 
-    def to_dict(self):
-        """Convert tag to dictionary."""
-        return {
-            'tag_id': self.tag_id,
-            'name': self.name,
-            'description': self.description,
-            'color': self.color,
-            'created_by': self.created_by,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-
     def __repr__(self):
         """String representation of the tag."""
         return f'<Tag {self.name}>'
 
-class BookTag(db.Model):
+class BookTag(BaseModel):
     """Model for book-tag associations."""
     __tablename__ = 'book_tags'
     
@@ -79,6 +67,7 @@ class BookTag(db.Model):
         self.book_id = book_id
         self.tag_id = tag_id
         self.added_by = added_by
+        self.is_active = True
 
     @classmethod
     def get_book_tags(cls, book_id):
@@ -90,18 +79,15 @@ class BookTag(db.Model):
         """Get all books with a specific tag."""
         return cls.query.filter_by(tag_id=tag_id).all()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert book-tag association to dictionary."""
-        return {
-            'book_tag_id': self.book_tag_id,
-            'book_id': self.book_id,
-            'tag_id': self.tag_id,
-            'added_by': self.added_by,
-            'added_at': self.added_at.isoformat() if self.added_at else None,
-            'book': self.book.to_dict() if self.book else None,
-            'tag': self.tag.to_dict() if self.tag else None,
-            'adder': self.adder.to_dict() if self.adder else None
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add book-tag specific fields
+        if self.added_at:
+            result['added_at'] = self.added_at.isoformat()
+            
+        return result
 
     def __repr__(self):
         """String representation of the book-tag association."""

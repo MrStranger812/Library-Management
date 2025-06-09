@@ -1,26 +1,39 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import render_template, jsonify, request
 from flask_login import login_required, current_user
 from models.user import User
-from utils.security import permission_required
+from utils.security import permission_required, Security
 from utils.validation import validate_json_schema_decorator
+from routes.generic_crud_routes import CRUDBlueprint
 
-users_bp = Blueprint('users', __name__)
+# Create the users blueprint with CRUD functionality
+users_crud = CRUDBlueprint(
+    name='users',
+    model_class=User,
+    permission_prefix='users',
+    validation_schemas={
+        'create': {
+            'type': 'object',
+            'required': ['username', 'email', 'password'],
+            'properties': {
+                'username': {'type': 'string'},
+                'email': {'type': 'string', 'format': 'email'},
+                'password': {'type': 'string', 'minLength': 8},
+                'first_name': {'type': 'string'},
+                'last_name': {'type': 'string'}
+            }
+        }
+    }
+)
 
-@users_bp.route('/users')
+# Add custom routes
+@users_crud.blueprint.route('/users')
 @login_required
 @permission_required('manage_users')
 def index():
     """Render the users management page."""
     return render_template('users/index.html')
 
-@users_bp.route('/api/users', methods=['GET'])
-@login_required
-@permission_required('manage_users')
-def get_users():
-    users = User.get_all()
-    return jsonify([user.to_dict() for user in users])
-
-@users_bp.route('/api/users', methods=['POST'])
+@users_crud.blueprint.route('/api/users', methods=['POST'])
 @login_required
 @permission_required('manage_users')
 @validate_json_schema_decorator({
@@ -56,4 +69,7 @@ def add_user():
         )
         return jsonify({'success': True, 'user_id': user.user_id})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400 
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# Export the blueprint
+users_bp = users_crud.blueprint 

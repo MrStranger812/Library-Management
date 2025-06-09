@@ -3,9 +3,9 @@ Category model for the Library Management System.
 """
 
 from models import db
-from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class Category(db.Model):
+class Category(BaseModel):
     """Model for book categories."""
     __tablename__ = 'categories'
 
@@ -13,9 +13,6 @@ class Category(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)
     parent_category_id = db.Column(db.Integer, db.ForeignKey('categories.category_id', ondelete='SET NULL'), index=True)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
-    is_active = db.Column(db.Boolean, default=True, index=True)
 
     # Self-referential relationship for parent-child categories
     parent = db.relationship('Category', remote_side=[category_id], backref=db.backref('subcategories', lazy='dynamic'))
@@ -27,26 +24,9 @@ class Category(db.Model):
         self.parent_category_id = parent_category_id
         self.is_active = True
 
-    def to_dict(self):
-        """Convert category to dictionary."""
-        return {
-            'category_id': self.category_id,
-            'name': self.name,
-            'description': self.description,
-            'parent_category_id': self.parent_category_id,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-
     def __repr__(self):
         """String representation of the category."""
         return f'<Category {self.name}>'
-
-    @classmethod
-    def get_by_id(cls, category_id):
-        """Get a category by its ID."""
-        return cls.query.get(category_id)
 
     @classmethod
     def get_by_name(cls, name):

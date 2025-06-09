@@ -7,8 +7,9 @@ from models import db
 from datetime import UTC, datetime, timedelta, date
 from sqlalchemy import CheckConstraint, Index, func
 from models.fine import Fine
+from models.base_model import BaseModel
 
-class Borrowing(db.Model):
+class Borrowing(BaseModel):
     """Model for book borrowings."""
     __tablename__ = 'borrowings'
     
@@ -21,8 +22,6 @@ class Borrowing(db.Model):
     return_date = db.Column(db.Date, nullable=True, index=True)
     status = db.Column(db.String(20), nullable=False, default='borrowed', index=True)
     renewal_count = db.Column(db.Integer, default=0, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     user = db.relationship('User', back_populates='borrowings')
@@ -45,11 +44,7 @@ class Borrowing(db.Model):
         self.due_date = due_date or (date.today() + timedelta(days=14))
         self.status = status
         self.renewal_count = 0
-
-    @classmethod
-    def get_by_id(cls, borrowing_id):
-        """Get a borrowing by its ID."""
-        return cls.query.get(borrowing_id)
+        self.is_active = True
 
     @classmethod
     def get_user_borrowings(cls, user_id):
@@ -141,32 +136,30 @@ class Borrowing(db.Model):
         
         db.session.commit()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert borrowing to dictionary."""
-        return {
-            'borrowing_id': self.borrowing_id,
-            'user_id': self.user_id,
-            'book_id': self.book_id,
-            'copy_id': self.copy_id,
-            'borrow_date': self.borrow_date.isoformat() if self.borrow_date else None,
-            'due_date': self.due_date.isoformat() if self.due_date else None,
-            'return_date': self.return_date.isoformat() if self.return_date else None,
-            'status': self.status,
-            'renewal_count': self.renewal_count,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add borrowing-specific fields
+        if self.borrow_date:
+            result['borrow_date'] = self.borrow_date.isoformat()
+        if self.due_date:
+            result['due_date'] = self.due_date.isoformat()
+        if self.return_date:
+            result['return_date'] = self.return_date.isoformat()
+            
+        result.update({
             'is_overdue': self.is_overdue(),
-            'days_overdue': self.days_overdue(),
-            'book': self.book.to_dict() if self.book else None,
-            'copy': self.copy.to_dict() if self.copy else None,
-            'fines': [fine.to_dict() for fine in self.fines]
-        }
+            'days_overdue': self.days_overdue()
+        })
+        
+        return result
 
     def __repr__(self):
         """String representation of the borrowing."""
         return f'<Borrowing {self.borrowing_id}: {self.book.title if self.book else None}>'
 
-class Reservation(db.Model):
+class Reservation(BaseModel):
     """Model for book reservations."""
     __tablename__ = 'reservations'
     
@@ -176,8 +169,6 @@ class Reservation(db.Model):
     reservation_date = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
     expiry_date = db.Column(db.Date, nullable=False, index=True)
     status = db.Column(db.Enum('pending', 'fulfilled', 'cancelled', 'expired'), default='pending', index=True)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
     notes = db.Column(db.Text)
 
     # Relationships
@@ -196,11 +187,7 @@ class Reservation(db.Model):
         self.expiry_date = expiry_date
         self.notes = notes
         self.status = 'pending'
-
-    @classmethod
-    def get_by_id(cls, reservation_id):
-        """Get a reservation by its ID."""
-        return cls.query.get(reservation_id)
+        self.is_active = True
 
     @classmethod
     def get_user_reservations(cls, user_id, status=None):
@@ -247,22 +234,18 @@ class Reservation(db.Model):
             return True
         return False
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert reservation to dictionary."""
-        return {
-            'reservation_id': self.reservation_id,
-            'user_id': self.user_id,
-            'book_id': self.book_id,
-            'reservation_date': self.reservation_date.isoformat() if self.reservation_date else None,
-            'expiry_date': self.expiry_date.isoformat() if self.expiry_date else None,
-            'status': self.status,
-            'notes': self.notes,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'book': self.book.to_dict() if self.book else None,
-            'user': self.user.to_dict() if self.user else None
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        # Add reservation-specific fields
+        if self.reservation_date:
+            result['reservation_date'] = self.reservation_date.isoformat()
+        if self.expiry_date:
+            result['expiry_date'] = self.expiry_date.isoformat()
+            
+        return result
 
     def __repr__(self):
         """String representation of the reservation."""
-        return f'<Reservation {self.reservation_id}: {self.book.title if self.book else "Unknown Book"}>'
+        return f'<Reservation {self.reservation_id}: {self.book.title if self.book else None}>'

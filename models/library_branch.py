@@ -5,8 +5,9 @@ Tracks different branches of the library.
 
 from extensions import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class LibraryBranch(db.Model):
+class LibraryBranch(BaseModel):
     """Model for library branches."""
     __tablename__ = 'library_branches'
     
@@ -64,22 +65,15 @@ class LibraryBranch(db.Model):
         self.updated_at = datetime.now(UTC)
         db.session.commit()
 
-    def to_dict(self):
+    def to_dict(self, exclude=None, include_relationships=True):
         """Convert branch to dictionary."""
-        return {
-            'branch_id': self.branch_id,
-            'name': self.name,
-            'address': self.address,
-            'phone': self.phone,
-            'email': self.email,
-            'manager_id': self.manager_id,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'manager': self.manager.to_dict() if self.manager else None,
-            'event_count': self.events.count() if self.events else 0,
-            'book_copy_count': self.book_copies.count() if self.book_copies else 0
-        }
+        result = super().to_dict(exclude=exclude, include_relationships=include_relationships)
+        
+        if include_relationships:
+            result['event_count'] = self.events.count() if self.events else 0
+            result['book_copy_count'] = self.book_copies.count() if self.book_copies else 0
+            
+        return result
 
     def __repr__(self):
         """String representation of the branch."""

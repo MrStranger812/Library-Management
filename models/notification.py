@@ -5,8 +5,9 @@ Includes Notification, AuditLog, and UserPreference models.
 
 from models import db
 from datetime import UTC, datetime
+from models.base_model import BaseModel
 
-class Notification(db.Model):
+class Notification(BaseModel):
     __tablename__ = 'notifications'
     
     notification_id = db.Column(db.Integer, primary_key=True)
@@ -15,7 +16,6 @@ class Notification(db.Model):
     message = db.Column(db.Text, nullable=False)
     type = db.Column(db.Enum('info', 'warning', 'error', 'success'), default='info', index=True)
     is_read = db.Column(db.Boolean, default=False, index=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now(UTC), index=True)
     read_at = db.Column(db.DateTime)
 
     # Relationships
@@ -26,6 +26,7 @@ class Notification(db.Model):
         self.title = title
         self.message = message
         self.type = type
+        self.is_active = True
 
     @classmethod
     def get_by_id(cls, notification_id):
@@ -59,7 +60,7 @@ class Notification(db.Model):
             'read_at': self.read_at.isoformat() if self.read_at else None
         }
 
-class AuditLog(db.Model):
+class AuditLog(BaseModel):
     __tablename__ = 'audit_logs'
     
     log_id = db.Column(db.Integer, primary_key=True)
@@ -71,7 +72,6 @@ class AuditLog(db.Model):
     new_values = db.Column(db.JSON)
     ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.String(255))
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now(UTC), index=True)
 
     # Relationships
     user = db.relationship('User', backref='audit_logs')
@@ -86,6 +86,7 @@ class AuditLog(db.Model):
         self.new_values = new_values
         self.ip_address = ip_address
         self.user_agent = user_agent
+        self.is_active = True
 
     @classmethod
     def get_by_id(cls, log_id):
@@ -120,15 +121,13 @@ class AuditLog(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-class UserPreference(db.Model):
+class UserPreference(BaseModel):
     __tablename__ = 'user_preferences'
     
     preference_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
     preference_key = db.Column(db.String(50), nullable=False, index=True)
     preference_value = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     user = db.relationship('User', backref='preferences')
@@ -141,6 +140,7 @@ class UserPreference(db.Model):
         self.user_id = user_id
         self.preference_key = preference_key
         self.preference_value = preference_value
+        self.is_active = True
 
     @classmethod
     def get_by_id(cls, preference_id):

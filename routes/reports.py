@@ -1,15 +1,25 @@
-from flask import Blueprint, jsonify, request, render_template
+from flask import render_template, jsonify
 from models.reports import Reports
 from utils.security import permission_required
 from utils.error_handler import handle_error
+from routes.generic_crud_routes import CRUDBlueprint
 
-reports_bp = Blueprint('reports', __name__)
+# Create the reports blueprint with CRUD functionality
+reports_crud = CRUDBlueprint(
+    name='reports',
+    model_class=Reports,
+    permission_prefix='admin'  # All report operations require admin permission
+)
 
-@reports_bp.route('/reports')
+# Add custom routes
+@reports_crud.blueprint.route('/reports')
 @permission_required('admin')
 def index():
     """Render the reports management page."""
     return render_template('reports/index.html')
+
+# Export the blueprint
+reports_bp = reports_crud.blueprint
 
 @reports_bp.route('/reports', methods=['GET'])
 @permission_required('admin')

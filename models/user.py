@@ -8,10 +8,10 @@ from models import db
 from extensions import bcrypt
 from datetime import UTC, datetime
 import re
-
+from models.base_model import BaseModel
 from models.borrowing import Borrowing
 
-class User(UserMixin, db.Model):
+class User(UserMixin, BaseModel):
     """Model for library users."""
     __tablename__ = 'users'
     
@@ -21,10 +21,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False, index=True)
     full_name = db.Column(db.String(100), nullable=False, index=True)
     role = db.Column(db.Enum('admin', 'librarian', 'member'), nullable=False, default='member', index=True)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
     last_login = db.Column(db.DateTime, nullable=True, index=True)
-    is_active = db.Column(db.Boolean, default=True, index=True)
     profile_image = db.Column(db.String(255), nullable=True)
     phone = db.Column(db.String(20), nullable=True, index=True)
     address = db.Column(db.Text, nullable=True)
@@ -112,13 +109,11 @@ class User(UserMixin, db.Model):
     def deactivate(self):
         """Deactivate the user account."""
         self.is_active = False
-        self.updated_at = datetime.now(UTC)
         db.session.commit()
 
     def activate(self):
         """Activate the user account."""
         self.is_active = True
-        self.updated_at = datetime.now(UTC)
         db.session.commit()
 
     def to_dict(self):
@@ -132,7 +127,6 @@ class User(UserMixin, db.Model):
             'is_active': self.is_active,
             'phone': self.phone,
             'address': self.address,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'profile_image': self.profile_image,
             'membership': self.memberships.filter_by(is_active=True).first().to_dict() if self.memberships.filter_by(is_active=True).first() else None
@@ -173,15 +167,13 @@ class User(UserMixin, db.Model):
         ).scalar()
         return float(result) if result else 0.0
 
-class Permission(db.Model):
+class Permission(BaseModel):
     """Model for user permissions."""
     __tablename__ = 'permissions'
     
     permission_id = db.Column(db.Integer, primary_key=True)
     permission_name = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
-    updated_at = db.Column(db.DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     user_permissions = db.relationship('UserPermission', backref='permission', lazy='dynamic', cascade='all, delete-orphan')
@@ -190,21 +182,13 @@ class Permission(db.Model):
         """Initialize a new permission."""
         self.permission_name = permission_name
         self.description = description
-
-    def to_dict(self):
-        """Convert permission to dictionary."""
-        return {
-            'permission_id': self.permission_id,
-            'permission_name': self.permission_name,
-            'description': self.description,
-            'created_at': self.created_at.isoformat() if self.created_at else None
-        }
+        self.is_active = True
 
     def __repr__(self):
         """String representation of the permission."""
         return f'<Permission {self.permission_name}>'
 
-class UserPermission(db.Model):
+class UserPermission(BaseModel):
     """Model for user-permission assignments."""
     __tablename__ = 'user_permissions'
     
@@ -214,7 +198,6 @@ class UserPermission(db.Model):
     granted_by = db.Column(db.Integer, db.ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False, index=True)
     granted_at = db.Column(db.DateTime, default=datetime.now(UTC), nullable=False, index=True)
     expires_at = db.Column(db.DateTime, nullable=True, index=True)
-    is_active = db.Column(db.Boolean, default=True, index=True)
 
     __table_args__ = (
         db.UniqueConstraint('user_id', 'permission_id', name='unique_user_permission'),
@@ -227,19 +210,6 @@ class UserPermission(db.Model):
         self.granted_by = granted_by
         self.expires_at = expires_at
         self.is_active = True
-
-    def to_dict(self):
-        """Convert user permission to dictionary."""
-        return {
-            'user_permission_id': self.user_permission_id,
-            'user_id': self.user_id,
-            'permission_id': self.permission_id,
-            'granted_by': self.granted_by,
-            'granted_at': self.granted_at.isoformat() if self.granted_at else None,
-            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
-            'is_active': self.is_active,
-            'permission': self.permission.to_dict() if self.permission else None
-        }
 
     def deactivate(self):
         """Deactivate the permission."""
