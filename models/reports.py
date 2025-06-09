@@ -9,6 +9,8 @@ from sqlalchemy import func, case, desc, and_
 from models.borrowing import Borrowing
 from models.book import Book
 from models.user import User
+from models.fine import Fine
+from models.fine_payment import FinePayment
 
 class Reports:
     """Class containing various reporting methods for the library system."""
@@ -81,12 +83,18 @@ class Reports:
             User,
             func.count(Borrowing.borrowing_id).label('borrow_count'),
             func.sum(case((Borrowing.status == 'overdue', 1), else_=0)).label('overdue_count'),
-            func.sum(Borrowing.fine_amount).label('total_fines')
+            func.sum(Fine.amount).label('total_fines')
         ).outerjoin(
             Borrowing,
             and_(
                 User.user_id == Borrowing.user_id,
                 Borrowing.borrow_date >= datetime.now(UTC).date() - timedelta(days=days)
+            )
+        ).outerjoin(
+            Fine,
+            and_(
+                Borrowing.borrowing_id == Fine.borrowing_id,
+                Fine.created_at >= datetime.now(UTC) - timedelta(days=days)
             )
         ).group_by(
             User.user_id
@@ -105,25 +113,25 @@ class Reports:
         Returns:
             list: List of dictionaries containing branch statistics.
         """
-        from models.branch import Branch
+        from models.library_branch import LibraryBranch
         from models.book_copy import BookCopy
         
         query = db.session.query(
-            Branch,
+            LibraryBranch,
             func.count(BookCopy.copy_id).label('total_copies'),
             func.sum(case((BookCopy.is_available == True, 1), else_=0)).label('available_copies'),
             func.count(Borrowing.borrowing_id).label('active_borrowings')
         ).outerjoin(
-            BookCopy, Branch.branch_id == BookCopy.branch_id
+            BookCopy, LibraryBranch.branch_id == BookCopy.branch_id
         ).outerjoin(
             Borrowing, BookCopy.copy_id == Borrowing.copy_id
         )
         
         if branch_id:
-            query = query.filter(Branch.branch_id == branch_id)
+            query = query.filter(LibraryBranch.branch_id == branch_id)
             
         return query.group_by(
-            Branch.branch_id
+            LibraryBranch.branch_id
         ).all()
 
     @staticmethod
@@ -137,13 +145,15 @@ class Reports:
         Returns:
             dict: Dictionary containing fine statistics.
         """
-        from models.fine import Fine
-        
         return db.session.query(
             func.sum(Fine.amount).label('total_fines'),
-            func.count(case((Fine.is_paid == True, 1))).label('paid_fines'),
-            func.count(case((Fine.is_paid == False, 1))).label('unpaid_fines'),
-            func.avg(Fine.amount).label('average_fine')
+            func.count(case((Fine.status == 'paid', 1))).label('paid_fines'),
+            func.count(case((Fine.status == 'pending', 1))).label('unpaid_fines'),
+            func.avg(Fine.amount).label('average_fine'),
+            func.sum(FinePayment.amount).label('total_payments')
+        ).outerjoin(
+            FinePayment,
+            Fine.fine_id == FinePayment.fine_id
         ).filter(
             Fine.created_at >= datetime.now(UTC) - timedelta(days=days)
         ).first()

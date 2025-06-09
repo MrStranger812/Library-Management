@@ -1,30 +1,28 @@
-"""
-Initialize all models for the Library Management System.
-Import order is important for foreign key relationships.
+"""Models package for the Library Management System.
+
+This package contains all the database models used in the application.
+Models are imported in order to maintain foreign key relationships.
 """
 
-from extensions import db
+from flask_sqlalchemy import SQLAlchemy
+
+# Initialize SQLAlchemy instance
+db = SQLAlchemy()
 
 # Base models (no foreign keys)
 from models.user import User
-from models.publisher import Publisher
-from models.category import Category
-from models.author import Author
+from models.book import Book
+from models.library_branch import LibraryBranch
+from models.membership import MembershipType, UserMembership
 from models.tag import Tag, BookTag
 
 # Models with foreign keys to base models
-from models.book import Book
-from models.book_copy import BookCopy
-from models.book_author import BookAuthor
-from models.book_review import BookReview
-from models.membership import MembershipType, UserMembership
-
-# Models with foreign keys to previous models
-from models.borrowing import Borrowing, Fine, FinePayment, Reservation
+from models.borrowing import Borrowing, Reservation
+from models.fine import Fine
+from models.fine_payment import FinePayment
 from models.library_event import LibraryEvent
 from models.event_registration import EventRegistration
 from models.notification import Notification, AuditLog, UserPreference
-from .library_branch import LibraryBranch
 
 def init_models():
     """Initialize all models and create database tables."""
@@ -34,21 +32,21 @@ def init_models():
 
 # Export all models
 __all__ = [
+    'db',
     'User',
     'Book',
-    'Author',
-    'Publisher',
-    'Category',
-    'BookAuthor',
-    'BookReview',
+    'LibraryBranch',
     'MembershipType',
     'UserMembership',
+    'Tag',
+    'BookTag',
     'Borrowing',
+    'Reservation',
     'Fine',
     'FinePayment',
-    'Reservation',
     'LibraryEvent',
+    'EventRegistration',
     'Notification',
     'AuditLog',
-    'UserPreference',
+    'UserPreference'
 ] 

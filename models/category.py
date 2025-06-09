@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 class Category(db.Model):
     """Model for book categories."""
     __tablename__ = 'categories'
-    
+
     category_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)

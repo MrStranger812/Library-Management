@@ -1,290 +1,53 @@
-{% extends "base.html" %}
+{% extends "layout.html" %}
 
-{% block title %}User Preferences{% endblock %}
+{% block title %}Preferences Management{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-    <h1 class="h2 mb-4">User Preferences</h1>
-
+<div class="container mt-4">
     <div class="row">
-        <!-- Navigation -->
-        <div class="col-md-3">
-            <div class="list-group mb-4">
-                <a href="#notifications" class="list-group-item list-group-item-action active" data-bs-toggle="list">
-                    <i class="fas fa-bell"></i> Notifications
-                </a>
-                <a href="#display" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-desktop"></i> Display
-                </a>
-                <a href="#search" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-search"></i> Search
-                </a>
-                <a href="#reading" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-book"></i> Reading
-                </a>
-                <a href="#privacy" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-shield-alt"></i> Privacy
-                </a>
-            </div>
-        </div>
-
-        <!-- Content -->
-        <div class="col-md-9">
-            <div class="tab-content">
-                <!-- Notifications -->
-                <div class="tab-pane fade show active" id="notifications">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Notification Preferences</h5>
-                            <form id="notificationForm">
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="email_notifications" 
-                                               {% if preferences.email_notifications %}checked{% endif %}>
-                                        <label class="form-check-label" for="email_notifications">
-                                            Email Notifications
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="sms_notifications"
-                                               {% if preferences.sms_notifications %}checked{% endif %}>
-                                        <label class="form-check-label" for="sms_notifications">
-                                            SMS Notifications
-                                        </label>
-                                    </div>
-                                </div>
-                                <h6 class="mt-4">Notification Types</h6>
-                                <div class="mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="notify_due_date"
-                                               {% if preferences.notification_types.due_date %}checked{% endif %}>
-                                        <label class="form-check-label" for="notify_due_date">
-                                            Due Date Reminders
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="notify_overdue"
-                                               {% if preferences.notification_types.overdue %}checked{% endif %}>
-                                        <label class="form-check-label" for="notify_overdue">
-                                            Overdue Notifications
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="notify_reservation"
-                                               {% if preferences.notification_types.reservation %}checked{% endif %}>
-                                        <label class="form-check-label" for="notify_reservation">
-                                            Reservation Updates
-                                        </label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="notify_system"
-                                               {% if preferences.notification_types.system %}checked{% endif %}>
-                                        <label class="form-check-label" for="notify_system">
-                                            System Notifications
-                                        </label>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </form>
+        <div class="col-12">
+            <h1 class="mb-4">Preferences Management</h1>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form id="preferencesForm" class="row g-3">
+                        <div class="col-md-6">
+                            <label for="theme" class="form-label">Theme</label>
+                            <select class="form-select" id="theme">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Display -->
-                <div class="tab-pane fade" id="display">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Display Preferences</h5>
-                            <form id="displayForm">
-                                <div class="mb-3">
-                                    <label for="theme" class="form-label">Theme</label>
-                                    <select class="form-select" id="theme">
-                                        <option value="light" {% if preferences.theme == 'light' %}selected{% endif %}>Light</option>
-                                        <option value="dark" {% if preferences.theme == 'dark' %}selected{% endif %}>Dark</option>
-                                        <option value="system" {% if preferences.theme == 'system' %}selected{% endif %}>System Default</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="language" class="form-label">Language</label>
-                                    <select class="form-select" id="language">
-                                        <option value="en" {% if preferences.language == 'en' %}selected{% endif %}>English</option>
-                                        <option value="es" {% if preferences.language == 'es' %}selected{% endif %}>Spanish</option>
-                                        <option value="fr" {% if preferences.language == 'fr' %}selected{% endif %}>French</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="items_per_page" class="form-label">Items per Page</label>
-                                    <input type="number" class="form-control" id="items_per_page" 
-                                           value="{{ preferences.items_per_page }}" min="5" max="100">
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="show_cover_images"
-                                               {% if preferences.show_cover_images %}checked{% endif %}>
-                                        <label class="form-check-label" for="show_cover_images">
-                                            Show Book Cover Images
-                                        </label>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </form>
+                        <div class="col-md-6">
+                            <label for="language" class="form-label">Language</label>
+                            <select class="form-select" id="language">
+                                <option value="en">English</option>
+                                <option value="es">Spanish</option>
+                                <option value="fr">French</option>
+                            </select>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Search -->
-                <div class="tab-pane fade" id="search">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Search Preferences</h5>
-                            <form id="searchForm">
-                                <div class="mb-3">
-                                    <label for="default_search_type" class="form-label">Default Search Type</label>
-                                    <select class="form-select" id="default_search_type">
-                                        <option value="title" {% if preferences.default_search_type == 'title' %}selected{% endif %}>Title</option>
-                                        <option value="author" {% if preferences.default_search_type == 'author' %}selected{% endif %}>Author</option>
-                                        <option value="isbn" {% if preferences.default_search_type == 'isbn' %}selected{% endif %}>ISBN</option>
-                                        <option value="category" {% if preferences.default_search_type == 'category' %}selected{% endif %}>Category</option>
-                                    </select>
-                                </div>
-                            </form>
-
-                            <h6 class="mt-4">Search History</h6>
-                            <div class="list-group mb-4">
-                                {% for query in preferences.search_history %}
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ query }}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removeFromHistory('{{ query }}')">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
-                                {% else %}
-                                <p class="text-muted">No search history</p>
-                                {% endfor %}
+                        <div class="col-md-6">
+                            <label for="notifications" class="form-label">Notifications</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="emailNotifications">
+                                <label class="form-check-label" for="emailNotifications">Email Notifications</label>
                             </div>
-
-                            <h6 class="mt-4">Saved Searches</h6>
-                            <div class="list-group">
-                                {% for search in preferences.saved_searches %}
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h6 class="mb-1">{{ search.name }}</h6>
-                                        <small class="text-muted">{{ search.created_at }}</small>
-                                    </div>
-                                    <div>
-                                        <button class="btn btn-sm btn-outline-primary me-2" onclick="useSavedSearch('{{ search.name }}')">
-                                            <i class="fas fa-search"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="removeSavedSearch('{{ search.name }}')">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                {% else %}
-                                <p class="text-muted">No saved searches</p>
-                                {% endfor %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="smsNotifications">
+                                <label class="form-check-label" for="smsNotifications">SMS Notifications</label>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Reading -->
-                <div class="tab-pane fade" id="reading">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Reading Preferences</h5>
-                            <form id="readingForm">
-                                <div class="mb-3">
-                                    <label for="books_per_year" class="form-label">Reading Goal (Books per Year)</label>
-                                    <input type="number" class="form-control" id="books_per_year" 
-                                           value="{{ preferences.reading_goals.books_per_year }}" min="0">
-                                </div>
-                                <div class="mb-3">
-                                    <label for="pages_per_day" class="form-label">Reading Goal (Pages per Day)</label>
-                                    <input type="number" class="form-control" id="pages_per_day" 
-                                           value="{{ preferences.reading_goals.pages_per_day }}" min="0">
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </form>
-
-                            <h6 class="mt-4">Preferred Categories</h6>
-                            <div class="mb-3">
-                                <div class="input-group">
-                                    <input type="text" class="form-control" id="new_category" placeholder="Add category">
-                                    <button class="btn btn-outline-primary" type="button" onclick="addPreferredCategory()">
-                                        Add
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="list-group mb-4">
-                                {% for category in preferences.preferred_categories %}
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ category }}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removePreferredCategory('{{ category }}')">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
-                                {% else %}
-                                <p class="text-muted">No preferred categories</p>
-                                {% endfor %}
-                            </div>
-
-                            <h6 class="mt-4">Preferred Authors</h6>
-                            <div class="list-group">
-                                {% for author_id in preferences.preferred_authors %}
-                                <div class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ author_id }}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="removePreferredAuthor({{ author_id }})">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
-                                {% else %}
-                                <p class="text-muted">No preferred authors</p>
-                                {% endfor %}
-                            </div>
+                        <div class="col-md-6">
+                            <label for="timezone" class="form-label">Timezone</label>
+                            <select class="form-select" id="timezone">
+                                <option value="UTC">UTC</option>
+                                <option value="EST">EST</option>
+                                <option value="PST">PST</option>
+                            </select>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Privacy -->
-                <div class="tab-pane fade" id="privacy">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Privacy Preferences</h5>
-                            <form id="privacyForm">
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="show_reading_history"
-                                               {% if preferences.show_reading_history %}checked{% endif %}>
-                                        <label class="form-check-label" for="show_reading_history">
-                                            Show Reading History
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="show_reviews"
-                                               {% if preferences.show_reviews %}checked{% endif %}>
-                                        <label class="form-check-label" for="show_reviews">
-                                            Show Reviews
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="allow_recommendations"
-                                               {% if preferences.allow_recommendations %}checked{% endif %}>
-                                        <label class="form-check-label" for="allow_recommendations">
-                                            Allow Personalized Recommendations
-                                        </label>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                            </form>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Save Preferences</button>
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -293,213 +56,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-// Form submission handlers
-document.getElementById('notificationForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    updatePreferences({
-        email_notifications: document.getElementById('email_notifications').checked,
-        sms_notifications: document.getElementById('sms_notifications').checked,
-        notification_types: {
-            due_date: document.getElementById('notify_due_date').checked,
-            overdue: document.getElementById('notify_overdue').checked,
-            reservation: document.getElementById('notify_reservation').checked,
-            system: document.getElementById('notify_system').checked
-        }
-    });
-});
-
-document.getElementById('displayForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    updatePreferences({
-        theme: document.getElementById('theme').value,
-        language: document.getElementById('language').value,
-        items_per_page: parseInt(document.getElementById('items_per_page').value),
-        show_cover_images: document.getElementById('show_cover_images').checked
-    });
-});
-
-document.getElementById('readingForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    updateReadingGoals(
-        parseInt(document.getElementById('books_per_year').value),
-        parseInt(document.getElementById('pages_per_day').value)
-    );
-});
-
-document.getElementById('privacyForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    updatePreferences({
-        show_reading_history: document.getElementById('show_reading_history').checked,
-        show_reviews: document.getElementById('show_reviews').checked,
-        allow_recommendations: document.getElementById('allow_recommendations').checked
-    });
-});
-
-// API calls
-function updatePreferences(data) {
-    fetch('/api/preferences', {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': '{{ current_user.api_key }}'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', 'Preferences updated successfully!');
-        } else {
-            showAlert('danger', data.message || 'Failed to update preferences.');
-        }
-    })
-    .catch(error => {
-        showAlert('danger', 'An error occurred while updating preferences.');
-        console.error('Error:', error);
-    });
-}
-
-function updateReadingGoals(books_per_year, pages_per_day) {
-    fetch('/api/preferences/reading-goals', {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': '{{ current_user.api_key }}'
-        },
-        body: JSON.stringify({
-            books_per_year: books_per_year,
-            pages_per_day: pages_per_day
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', 'Reading goals updated successfully!');
-        } else {
-            showAlert('danger', data.message || 'Failed to update reading goals.');
-        }
-    })
-    .catch(error => {
-        showAlert('danger', 'An error occurred while updating reading goals.');
-        console.error('Error:', error);
-    });
-}
-
-function addPreferredCategory() {
-    const category = document.getElementById('new_category').value.trim();
-    if (!category) return;
-
-    fetch('/api/preferences/preferred-categories', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': '{{ current_user.api_key }}'
-        },
-        body: JSON.stringify({ category: category })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', 'Category added successfully!');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            showAlert('danger', data.message || 'Failed to add category.');
-        }
-    })
-    .catch(error => {
-        showAlert('danger', 'An error occurred while adding category.');
-        console.error('Error:', error);
-    });
-}
-
-function removePreferredCategory(category) {
-    fetch(`/api/preferences/preferred-categories/${category}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': '{{ current_user.api_key }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', 'Category removed successfully!');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            showAlert('danger', data.message || 'Failed to remove category.');
-        }
-    })
-    .catch(error => {
-        showAlert('danger', 'An error occurred while removing category.');
-        console.error('Error:', error);
-    });
-}
-
-function removePreferredAuthor(authorId) {
-    fetch(`/api/preferences/preferred-authors/${authorId}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': '{{ current_user.api_key }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', 'Author removed successfully!');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            showAlert('danger', data.message || 'Failed to remove author.');
-        }
-    })
-    .catch(error => {
-        showAlert('danger', 'An error occurred while removing author.');
-        console.error('Error:', error);
-    });
-}
-
-function removeFromHistory(query) {
-    // This would need a new API endpoint to be implemented
-    showAlert('info', 'This feature is not yet implemented.');
-}
-
-function useSavedSearch(name) {
-    // This would need to be implemented based on your search functionality
-    showAlert('info', 'This feature is not yet implemented.');
-}
-
-function removeSavedSearch(name) {
-    fetch(`/api/preferences/saved-searches/${name}`, {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': '{{ current_user.api_key }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', 'Saved search removed successfully!');
-            setTimeout(() => window.location.reload(), 1500);
-        } else {
-            showAlert('danger', data.message || 'Failed to remove saved search.');
-        }
-    })
-    .catch(error => {
-        showAlert('danger', 'An error occurred while removing saved search.');
-        console.error('Error:', error);
-    });
-}
-
-function showAlert(type, message) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
-}
-</script>
+<script src="{{ url_for('static', filename='js/preferences.js') }}"></script>
 {% endblock %} 

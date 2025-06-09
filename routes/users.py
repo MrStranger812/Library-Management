@@ -1,10 +1,17 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required, current_user
 from models.user import User
 from utils.security import permission_required
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
 
 users_bp = Blueprint('users', __name__)
+
+@users_bp.route('/users')
+@login_required
+@permission_required('manage_users')
+def index():
+    """Render the users management page."""
+    return render_template('users/index.html')
 
 @users_bp.route('/api/users', methods=['GET'])
 @login_required
@@ -16,15 +23,15 @@ def get_users():
 @users_bp.route('/api/users', methods=['POST'])
 @login_required
 @permission_required('manage_users')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
-    'required': ['username', 'password', 'full_name', 'email', 'role'],
+    'required': ['username', 'email', 'password'],
     'properties': {
         'username': {'type': 'string'},
-        'password': {'type': 'string'},
-        'full_name': {'type': 'string'},
         'email': {'type': 'string', 'format': 'email'},
-        'role': {'type': 'string', 'enum': ['admin', 'librarian', 'member']}
+        'password': {'type': 'string', 'minLength': 8},
+        'first_name': {'type': 'string'},
+        'last_name': {'type': 'string'}
     }
 })
 def add_user():
@@ -43,9 +50,9 @@ def add_user():
         user = User.create(
             username=data['username'],
             password=data['password'],
-            full_name=data['full_name'],
+            full_name=data['first_name'] + ' ' + data['last_name'],
             email=data['email'],
-            role=data['role']
+            role='member'
         )
         return jsonify({'success': True, 'user_id': user.user_id})
     except Exception as e:

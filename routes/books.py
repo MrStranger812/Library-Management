@@ -1,15 +1,21 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required, current_user
 from models.book import Book
 from utils.security import Security
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
 
 books_bp = Blueprint('books', __name__)
+
+@books_bp.route('/books')
+@login_required
+def index():
+    """Render the books management page."""
+    return render_template('books/index.html')
 
 @books_bp.route('/api/books', methods=['POST'])
 @login_required
 @Security.require_api_key()
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'required': ['isbn', 'title', 'author', 'category_id'],
     'properties': {

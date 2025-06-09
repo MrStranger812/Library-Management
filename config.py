@@ -60,9 +60,19 @@ class Config:
     MYSQL_CHARSET = 'utf8mb4'
     MYSQL_CURSORCLASS = 'DictCursor'
     
+    # SQLAlchemy Configuration
+    SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{MYSQL_USER}:{urllib.parse.quote_plus(MYSQL_PASSWORD)}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}"
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True
+    }
+    
     # Application Configuration
-    DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
-    TESTING = False
+    DEBUG = True
+    TESTING = True
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = None
     

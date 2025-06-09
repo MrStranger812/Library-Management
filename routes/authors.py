@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from models.author import Author
 from utils.security import permission_required
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
 
 authors_bp = Blueprint('authors', __name__)
 
@@ -14,7 +14,7 @@ def get_authors():
 @authors_bp.route('/api/authors', methods=['POST'])
 @login_required
 @permission_required('manage_authors')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'required': ['first_name', 'last_name'],
     'properties': {
@@ -53,7 +53,7 @@ def get_author(author_id):
 @authors_bp.route('/api/authors/<int:author_id>', methods=['PUT'])
 @login_required
 @permission_required('manage_authors')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'properties': {
         'first_name': {'type': 'string'},

@@ -1,5 +1,6 @@
 from flask import jsonify, render_template
 from utils.logger import get_logger
+from functools import wraps
 
 logger = get_logger('app')
 
@@ -56,3 +57,14 @@ def request_wants_json():
     best = request.accept_mimetypes.best_match(['application/json', 'text/html'])
     return (best == 'application/json' and
             request.accept_mimetypes[best] > request.accept_mimetypes['text/html'])
+
+def handle_error(f):
+    """Decorator to handle errors in route functions and return JSON responses."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            logger.exception(f"Error in route: {e}")
+            return jsonify({"error": "Server Error", "message": str(e)}), 500
+    return decorated_function

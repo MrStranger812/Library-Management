@@ -1,73 +1,122 @@
 {% extends "layout.html" %}
-{% block title %}Home - Library Management System{% endblock %}
+
+{% block title %}Library Management System{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10">
-        <div class="jumbotron bg-light p-5 rounded">
-            <h1 class="display-4">Welcome to the Library Management System</h1>
-            <p class="lead">A comprehensive solution for managing library resources, users, and borrowing processes.</p>
-            <hr class="my-4">
-            <p>This system allows libraries to efficiently manage their book inventory, user accounts, borrowing processes, and administrative tasks.</p>
-            {% if current_user.is_authenticated %}
-            <a class="btn btn-primary btn-lg" href="{{ url_for('dashboard') }}" role="button">Go to Dashboard</a>
-            {% else %}
-            <a class="btn btn-primary btn-lg" href="{{ url_for('login') }}" role="button">Login</a>
-            <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('register') }}" role="button">Register</a>
-            {% endif %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">Welcome to Library Management System</h1>
+            <p class="lead">Manage your library resources efficiently with our comprehensive management system.</p>
         </div>
     </div>
-</div>
 
-<div class="row mt-5">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Book Management</h5>
-                <p class="card-text">Catalog and manage your entire book collection with ease. Track availability, categories, and more.</p>
+    <div class="row mt-4">
+        <!-- Book Management -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-book"></i> Book Management
+                    </h5>
+                    <p class="card-text">Manage your library's book collection, including adding new books, updating information, and tracking inventory.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Add new books</li>
+                        <li><i class="fas fa-check text-success"></i> Update book information</li>
+                        <li><i class="fas fa-check text-success"></i> Track inventory</li>
+                    </ul>
+                    <a href="{{ url_for('books.index') }}" class="btn btn-primary">Manage Books</a>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">User Management</h5>
-                <p class="card-text">Manage library members, staff, and administrators with role-based access control.</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Borrowing System</h5>
-                <p class="card-text">Handle book borrowing, returns, reservations, and automatic fine calculations.</p>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="row mt-4">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Reporting</h5>
-                <p class="card-text">Generate detailed reports on book usage, user activity, and library operations.</p>
+        <!-- User Management -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-users"></i> User Management
+                    </h5>
+                    <p class="card-text">Manage library members, their accounts, and access levels.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Register new members</li>
+                        <li><i class="fas fa-check text-success"></i> Manage user accounts</li>
+                        <li><i class="fas fa-check text-success"></i> Set access levels</li>
+                    </ul>
+                    <a href="{{ url_for('users.index') }}" class="btn btn-primary">Manage Users</a>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Notifications</h5>
-                <p class="card-text">Automated notifications for due dates, overdue books, and reservation fulfillment.</p>
+
+        <!-- Borrowing System -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-exchange-alt"></i> Borrowing System
+                    </h5>
+                    <p class="card-text">Handle book borrowing, returns, and manage due dates.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Process book loans</li>
+                        <li><i class="fas fa-check text-success"></i> Track returns</li>
+                        <li><i class="fas fa-check text-success"></i> Manage due dates</li>
+                    </ul>
+                    <a href="{{ url_for('borrowings.index') }}" class="btn btn-primary">Manage Borrowings</a>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Data Export</h5>
-                <p class="card-text">Export library data in various formats for backup or analysis purposes.</p>
+
+        <!-- Reports -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </h5>
+                    <p class="card-text">Generate comprehensive reports on library operations.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Borrowing statistics</li>
+                        <li><i class="fas fa-check text-success"></i> User activity</li>
+                        <li><i class="fas fa-check text-success"></i> Inventory reports</li>
+                    </ul>
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-primary">View Reports</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fines Management -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-money-bill-wave"></i> Fines Management
+                    </h5>
+                    <p class="card-text">Handle late returns and fine payments.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Calculate fines</li>
+                        <li><i class="fas fa-check text-success"></i> Process payments</li>
+                        <li><i class="fas fa-check text-success"></i> Track payment history</li>
+                    </ul>
+                    <a href="{{ url_for('fines.index') }}" class="btn btn-primary">Manage Fines</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-cog"></i> Settings
+                    </h5>
+                    <p class="card-text">Configure system settings and preferences.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> System configuration</li>
+                        <li><i class="fas fa-check text-success"></i> User preferences</li>
+                        <li><i class="fas fa-check text-success"></i> Security settings</li>
+                    </ul>
+                    <a href="{{ url_for('preferences.index') }}" class="btn btn-primary">Manage Settings</a>
+                </div>
             </div>
         </div>
     </div>

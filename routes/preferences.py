@@ -1,10 +1,18 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required, current_user
-from models.user_preference import UserPreference
+from models.notification import UserPreference
+from models.preferences import Preferences
 from utils.security import permission_required
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
+from utils.error_handler import handle_error
 
 preferences_bp = Blueprint('preferences', __name__)
+
+@preferences_bp.route('/preferences')
+@permission_required('admin')
+def index():
+    """Render the preferences management page."""
+    return render_template('preferences/index.html')
 
 @preferences_bp.route('/api/preferences', methods=['GET'])
 @login_required
@@ -16,7 +24,7 @@ def get_preferences():
 @preferences_bp.route('/api/preferences', methods=['PUT'])
 @login_required
 @permission_required('manage_preferences')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'properties': {
         'email_notifications': {'type': 'boolean'},

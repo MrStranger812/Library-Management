@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from models.tag import Tag
 from utils.security import permission_required
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
 
 tags_bp = Blueprint('tags', __name__)
 
@@ -16,7 +16,7 @@ def get_tags():
 @tags_bp.route('/api/tags', methods=['POST'])
 @login_required
 @permission_required('manage_tags')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'required': ['name'],
     'properties': {

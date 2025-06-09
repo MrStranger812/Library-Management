@@ -24,8 +24,7 @@ class EnhancedBorrowing:
         Returns:
             Tuple[bool, str]: (success, message)
         """
-        from models.user_membership import UserMembership
-        from models.membership_type import MembershipType
+        from models.membership import UserMembership, MembershipType
         from models.book import Book
         from models.borrowing import Borrowing
         from models.fine import Fine

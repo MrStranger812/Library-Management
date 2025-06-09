@@ -1,7 +1,6 @@
 import pytest
 from models.book import Book, Publisher, Category
-from models.tag import Tag
-from models.book_tag import BookTag
+from models.tag import Tag, BookTag
 from datetime import datetime
 
 def test_create_book(db_session):

@@ -9,6 +9,8 @@ from extensions import bcrypt
 from datetime import UTC, datetime
 import re
 
+from models.borrowing import Borrowing
+
 class User(UserMixin, db.Model):
     """Model for library users."""
     __tablename__ = 'users'

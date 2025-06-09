@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from models.library_event import LibraryEvent
 from utils.security import permission_required
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
 
 events_bp = Blueprint('events', __name__)
 
@@ -14,7 +14,7 @@ def get_events():
 @events_bp.route('/api/events', methods=['POST'])
 @login_required
 @permission_required('manage_events')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'required': ['title', 'event_type', 'start_time', 'end_time'],
     'properties': {
@@ -39,7 +39,7 @@ def add_event():
 @events_bp.route('/api/events/<int:event_id>', methods=['PUT'])
 @login_required
 @permission_required('manage_events')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'properties': {
         'title': {'type': 'string'},

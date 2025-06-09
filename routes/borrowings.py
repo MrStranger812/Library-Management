@@ -1,14 +1,21 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required, current_user
 from models.borrowing import Borrowing
 from utils.security import permission_required
-from utils.middleware import validate_json_schema
+from utils.validation import validate_json_schema_decorator
 
 borrowings_bp = Blueprint('borrowings', __name__)
 
+@borrowings_bp.route('/borrowings')
+@login_required
+@permission_required('manage_borrowings')
+def index():
+    """Render the borrowings management page."""
+    return render_template('borrowings/index.html')
+
 @borrowings_bp.route('/api/borrowings/borrow', methods=['POST'])
 @login_required
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'required': ['book_id'],
     'properties': {
@@ -32,7 +39,7 @@ def borrow_book():
 @borrowings_bp.route('/api/borrowings/return', methods=['POST'])
 @login_required
 @permission_required('manage_borrowings')
-@validate_json_schema({
+@validate_json_schema_decorator({
     'type': 'object',
     'required': ['borrowing_id'],
     'properties': {

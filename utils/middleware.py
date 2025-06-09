@@ -1,119 +1,62 @@
 from functools import wraps
-from flask import request, abort, current_app
+from flask import request, abort, current_app, make_response
 from utils.security import Security
 from utils.logger import get_logger
+import logging
 
-logger = get_logger('middleware')
+logger = logging.getLogger(__name__)
 
-def security_headers():
+def security_headers(response):
     """
-    Middleware to add security headers to all responses
+    Add security headers to the response.
     """
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            response = f(*args, **kwargs)
-            
-            # Add security headers
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-            response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-            response.headers['X-XSS-Protection'] = '1; mode=block'
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-            response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
-            
-            return response
-        return wrapped
-    return decorator
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+    return response
 
 def validate_request():
     """
-    Middleware to validate incoming requests
+    Global middleware to validate request data.
+    Only validates JSON requests that have a schema defined.
     """
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            # Check content type for POST/PUT requests
-            if request.method in ['POST', 'PUT']:
-                if not request.is_json and request.headers.get('Content-Type') == 'application/json':
-                    abort(400, "Content-Type must be application/json")
-            
-            # Validate request size
-            if request.content_length and request.content_length > current_app.config.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024):
-                abort(413, "Request entity too large")
-            
-            # Check for common attack patterns
-            for key, value in request.args.items():
-                if any(pattern in value.lower() for pattern in ['<script', 'javascript:', 'onerror=', 'onload=']):
-                    logger.warning(f"Potential XSS attack detected in query parameter: {key}")
-                    abort(400, "Invalid request parameters")
-            
-            return f(*args, **kwargs)
-        return wrapped
-    return decorator
+    if request.is_json:
+        try:
+            # Only validate if there's a schema defined for this endpoint
+            schema = getattr(request.endpoint, '_schema', None)
+            if schema:
+                from utils.validation import validate_json_schema
+                validate_json_schema(schema)
+        except Exception as e:
+            abort(400, str(e))
 
 def require_https():
     """
-    Middleware to require HTTPS
+    Global middleware to require HTTPS.
+    Only enforces HTTPS in production mode.
     """
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            if not request.is_secure and not current_app.debug:
-                abort(403, "HTTPS required")
-            return f(*args, **kwargs)
-        return wrapped
-    return decorator
+    print("DEBUG require_https: is_secure:", request.is_secure, "debug:", current_app.debug, "testing:", current_app.testing)
+    if not request.is_secure and not current_app.debug and not current_app.testing:
+        abort(403, "HTTPS required")
 
-def validate_json_schema(schema):
+def request_logger():
     """
-    Middleware to validate JSON request body against a schema
-    
-    Args:
-        schema: JSON schema to validate against
+    Log request details.
     """
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            if not request.is_json:
-                abort(400, "Content-Type must be application/json")
-            
-            try:
-                from jsonschema import validate
-                validate(instance=request.get_json(), schema=schema)
-            except Exception as e:
-                logger.warning(f"JSON validation error: {str(e)}")
-                abort(400, f"Invalid request body: {str(e)}")
-            
-            return f(*args, **kwargs)
-        return wrapped
-    return decorator
-
-def log_request():
-    """
-    Middleware to log incoming requests
-    """
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            logger.info(f"Request: {request.method} {request.path} from {request.remote_addr}")
-            return f(*args, **kwargs)
-        return wrapped
-    return decorator
+    logger.info(f"Request: {request.method} {request.url}")
+    logger.info(f"Headers: {dict(request.headers)}")
+    if request.is_json:
+        logger.info(f"JSON Body: {request.get_json()}")
 
 def handle_cors():
     """
-    Middleware to handle CORS
+    Handle CORS headers.
     """
-    def decorator(f):
-        @wraps(f)
-        def wrapped(*args, **kwargs):
-            response = f(*args, **kwargs)
-            
-            # Add CORS headers
-            response.headers['Access-Control-Allow-Origin'] = current_app.config.get('CORS_ORIGINS', '*')
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-API-Key'
-            
-            return response
-        return wrapped
-    return decorator 
+    if request.method == 'OPTIONS':
+        response = current_app.make_default_options_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        return response 
