@@ -143,28 +143,38 @@ GRANT SHOW DATABASES ON *.* TO 'library_backup'@'%';
 -- 8. ROW-LEVEL SECURITY VIEWS
 -- =====================================================
 
--- Create secure views that enforce row-level security
+DELIMITER //
+
+-- Create a function to get current user ID
+CREATE FUNCTION get_current_user_id() 
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    RETURN @current_user_id;
+END//
 
 -- Users can only see their own borrowings
 CREATE OR REPLACE VIEW user_borrowings_secure AS
 SELECT b.* FROM borrowings b
-WHERE b.user_id = @current_user_id;
+WHERE b.user_id = get_current_user_id()//
 
 -- Users can only see their own reservations
 CREATE OR REPLACE VIEW user_reservations_secure AS
 SELECT r.* FROM reservations r
-WHERE r.user_id = @current_user_id;
+WHERE r.user_id = get_current_user_id()//
 
 -- Users can only see their own notifications
 CREATE OR REPLACE VIEW user_notifications_secure AS
 SELECT n.* FROM notifications n
-WHERE n.user_id = @current_user_id;
+WHERE n.user_id = get_current_user_id()//
 
 -- Users can only see their own fines
 CREATE OR REPLACE VIEW user_fines_secure AS
 SELECT f.* FROM fines f
 JOIN borrowings b ON f.borrowing_id = b.borrowing_id
-WHERE b.user_id = @current_user_id;
+WHERE b.user_id = get_current_user_id()//
+
+DELIMITER ;
 
 -- =====================================================
 -- 9. SECURITY CONSTRAINTS AND TRIGGERS

@@ -35,6 +35,10 @@ def create_app(config_class=Config):
     # Load configuration
     app.config.from_object(config_class)
     
+    # Ensure SQLAlchemy configuration is set
+    if not app.config.get('SQLALCHEMY_DATABASE_URI'):
+        app.config['SQLALCHEMY_DATABASE_URI'] = config_class.SQLALCHEMY_DATABASE_URI
+    
     # Ensure debug mode is enabled in development
     app.config['DEBUG'] = True
     app.debug = True

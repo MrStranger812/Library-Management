@@ -42,7 +42,7 @@ def index():
 @preferences_crud.blueprint.route('/api/preferences', methods=['GET'])
 @login_required
 @permission_required('manage_preferences')
-def get_preferences():
+def get_user_preferences():
     prefs = UserPreference.get_by_user(current_user.user_id)
     return jsonify(prefs.to_dict() if prefs else {})
 
